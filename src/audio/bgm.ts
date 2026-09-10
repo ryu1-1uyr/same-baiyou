@@ -3,8 +3,12 @@
  *
  * 1 ランが 3〜12 分でループの切れ目が目立つため、旋律を持たせない構成にしている。
  * 深海のあいだはローパスで塞いで水中の唸りにし、深度 11 で空へ抜けたときに開く。
+ *
+ * public/bgm/ に音源が置かれていればそちらを優先し、合成は鳴らさない。
+ * 置かれた曲を深度で加工したりはしない（作った人の意図をそのまま出す）。
  */
 import { bgmBus, ensureAudio, getAudioSettings } from './engine.ts'
+import { hasAnyTrack, playTrack, stopTracks, type TrackId, tracksReady } from './tracks.ts'
 
 /** calm = 培養フェーズ、tense = 侵略フェーズ */
 export type Mood = 'calm' | 'tense'
@@ -126,19 +130,16 @@ function apply(n: Nodes, s: BgmState, immediate = false): void {
   n.pulseLfo.frequency.setTargetAtTime(0.7 + s.danger * 1.6, now, 0.6)
 }
 
-/** 鳴らし始める。ユーザー操作の中から呼ぶこと */
-export function startBgm(): void {
+/** 合成のドローンを鳴らし始める。音源が置かれていないときの受け皿 */
+function startSynth(ctx: AudioContext, bus: GainNode): void {
   if (nodes) return
-  const ctx = ensureAudio()
-  const bus = bgmBus()
-  if (!ctx || !bus) return
   nodes = build(ctx, bus)
   apply(nodes, current, true)
   // 突然始まると驚くので、2 秒かけて立ち上げる
   nodes.drone.gain.setTargetAtTime(0.5, ctx.currentTime, 0.7)
 }
 
-export function stopBgm(): void {
+function stopSynth(): void {
   const n = nodes
   if (!n) return
   nodes = null
@@ -147,6 +148,18 @@ export function stopBgm(): void {
   n.pulse.gain.setTargetAtTime(0.0001, t, 0.3)
   for (const o of n.osc) o.stop(t + 1.5)
   n.pulseOsc.stop(t + 1.5)
+}
+
+/** 音源と合成の両方を止める */
+export function stopBgm(): void {
+  stopSynth()
+  stopTracks()
+}
+
+/** その場面で鳴らす音源。深度の反転後は専用のトラックに移る */
+function trackFor(s: BgmState): TrackId {
+  if (s.depth >= BREACH_DEPTH) return 'sky'
+  return s.mood === 'tense' ? 'invasion' : 'culture'
 }
 
 /**
@@ -163,12 +176,26 @@ export function updateBgm(s: BgmState): void {
     return
   }
 
+  const ctx = ensureAudio()
+  const bus = bgmBus()
+  if (!ctx || !bus) return
+
+  // 走査が終わるまでは鳴らし始めない。
+  // 合成が一瞬鳴ってから音源に切り替わると、事故のように聞こえるため
+  if (!tracksReady(ctx)) return
+
   const changed =
     s.depth !== current.depth || s.mood !== current.mood || Math.abs(s.danger - current.danger) > 0.05
   current = changed ? s : current
 
+  if (hasAnyTrack()) {
+    stopSynth()
+    playTrack(ctx, bus, trackFor(current))
+    return
+  }
+
   if (!nodes) {
-    startBgm()
+    startSynth(ctx, bus)
     return
   }
   if (changed) apply(nodes, current)

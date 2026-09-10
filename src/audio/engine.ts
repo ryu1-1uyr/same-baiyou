@@ -12,7 +12,12 @@ export type AudioSettings = Record<Channel, number> & { muted: boolean }
 
 const KEY = 'inkurimentaru.audio.v1'
 
-const DEFAULTS: AudioSettings = { master: 0.7, se: 0.8, bgm: 0.45, muted: false }
+/*
+ * BGM の既定を 0 にしてあるのは、いま鳴るのが合成のドローンだけで、
+ * 自作の音源を public/bgm/ に置くまでは無音で始めたいため。
+ * 曲を入れたらここを上げる。
+ */
+const DEFAULTS: AudioSettings = { master: 0.7, se: 0.8, bgm: 0, muted: false }
 
 function clamp01(v: number): number {
   return Math.min(1, Math.max(0, v))

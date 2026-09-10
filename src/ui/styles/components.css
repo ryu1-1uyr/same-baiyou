@@ -1654,8 +1654,8 @@
 .audio-toggle {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   background: var(--c-panel);
   border: 1px solid var(--c-line);

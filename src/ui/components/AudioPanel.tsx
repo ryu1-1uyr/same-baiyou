@@ -62,7 +62,7 @@ export function AudioPanel() {
         title={open ? t.audio.close : t.audio.open}
         onClick={() => setOpen(!open)}
       >
-        <Sprite kind="ui" id={cfg.muted ? 'mute' : 'sound'} size={16} />
+        <Sprite kind="ui" id={cfg.muted ? 'mute' : 'sound'} size={32} />
       </button>
     </div>
   )

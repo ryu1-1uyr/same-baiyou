@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { playSe } from '../../audio/se.ts'
 import { type BuildingId, BUILDINGS, buildingName, costOf } from '../../game/buildings.ts'
 import { totalSharks } from '../../game/inventory.ts'
 import { clickValue, critChance, critMult, cultureRate, launchRate, sharkRate } from '../../game/tick.ts'
@@ -36,6 +37,11 @@ export function ProducePanel() {
    */
   const onCollect = (e: React.MouseEvent<HTMLButtonElement>) => {
     const { gained, crit } = manualClick()
+    // ドラフト提示中とラン終了後は採取が通らない。音も鳴らさない
+    if (gained > 0) {
+      playSe('collect')
+      if (crit) playSe('crit')
+    }
     const host = areaRef.current
     if (!host) return
     const r = host.getBoundingClientRect()
@@ -110,7 +116,10 @@ export function ProducePanel() {
                 className="buy"
                 data-afford={s.culture >= cost}
                 disabled={s.culture < cost}
-                onClick={() => buy(i)}
+                onClick={() => {
+                  buy(i)
+                  playSe('buy')
+                }}
               >
                 <Sprite kind="building" id={b.id} />
                 <span className="buy-name">

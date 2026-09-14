@@ -1,0 +1,47 @@
+name: Retarget stacked PRs
+
+# 別の PR のブランチをマージ先にした PR（積んだ PR）は、下の PR がマージされても
+# マージ先がそのブランチのまま残る。その状態でマージすると main に入らない（#13・#21 で発生）。
+#
+# 下の PR がマージされたら、そのブランチをマージ先にしている PR のマージ先を、
+# 下の PR と同じマージ先に付け替える。
+#
+# リポジトリ設定「Automatically delete head branches」が有効ならブランチ削除と同時に
+# GitHub が付け替えるので、このワークフローは何もせずに終わる。設定が外れていたときの保険。
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  retarget:
+    # フォークからの PR は、同じ名前のブランチを持つ別の PR を巻き込みうるので対象にしない
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: マージ先を付け替える
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          # ブランチ名はスクリプトに直接埋め込まず、環境変数で渡す（名前にシェルの記号が入っても実行されないように）
+          MERGED_NUMBER: ${{ github.event.pull_request.number }}
+          MERGED_HEAD: ${{ github.event.pull_request.head.ref }}
+          MERGED_BASE: ${{ github.event.pull_request.base.ref }}
+        # gh pr edit は GITHUB_TOKEN だと読めない項目を問い合わせて失敗することがあるので、REST API を直接呼ぶ
+        run: |
+          set -euo pipefail
+          numbers=$(gh api -X GET "repos/$REPO/pulls" -f base="$MERGED_HEAD" -f state=open --jq '.[].number')
+          if [ -z "$numbers" ]; then
+            echo "$MERGED_HEAD をマージ先にしている PR はない"
+            exit 0
+          fi
+          for n in $numbers; do
+            gh api -X PATCH "repos/$REPO/pulls/$n" -f base="$MERGED_BASE" --silent
+            gh api "repos/$REPO/issues/$n/comments" --silent \
+              -f body="#$MERGED_NUMBER がマージされたので、マージ先を \`$MERGED_HEAD\` から \`$MERGED_BASE\` に付け替えました。"
+            echo "#$n: $MERGED_HEAD → $MERGED_BASE"
+          done

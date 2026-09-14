@@ -60,6 +60,18 @@ export type Config = {
     maxRank: number
     /** 1 回のドラフトで提示する枚数 */
     draftSize: number
+    /**
+     * 持っているレア以上の変異が再提示されるときの重みの倍率。
+     * レア以上は元の重みが小さく、狙って重ねても R3 に届きにくいため底上げする。
+     * コモンには掛けない（ごちゃ混ぜに取る遊び方の枠を削らないため）
+     */
+    reofferMult: number
+    /**
+     * 解禁済みの派生種レシピで、材料の片方でも持っているとき、材料 2 種の重みに掛ける倍率。
+     * ドラフトの枠は 3〜4 枚しかなく、特定の材料を R3 まで重ねる機会がほとんど来ないため。
+     * 実測で、レシピを狙うプレイヤーの 1 ラン あたりの派生数が 0.17〜0.40 種から 0.68〜1.08 種になる
+     */
+    recipeMaterialMult: number
   }
 
   policy: {
@@ -113,6 +125,8 @@ export const DEFAULT_CONFIG: Config = {
     rankPowerMult: 3.0,
     maxRank: 3,
     draftSize: 3,
+    reofferMult: 2,
+    recipeMaterialMult: 3,
   },
 
   policy: {

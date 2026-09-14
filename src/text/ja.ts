@@ -541,6 +541,7 @@ export const ja = {
     elapsed: '経過時間',
     produced: '検体生産数',
     award: '研究予算',
+    bossLeft: '{name} の残り HP',
     championTitle: '今回の最高戦力サメ',
     championInfo: '変異 {traits} 種 / 戦闘力 {power} / {count} 体',
     speciesTitle: '実験記録 — 生み出した検体',

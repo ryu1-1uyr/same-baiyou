@@ -1,5 +1,5 @@
 import { cachedPower, hasMutation, MUTATIONS, nameOfMask } from '../../game/mutations.ts'
-import { depthName } from '../../game/targets.ts'
+import { bossHp, depthName } from '../../game/targets.ts'
 import { getConfig, getLastAward, setScreen } from '../../store/gameStore.ts'
 import { fill, t } from '../../text/index.ts'
 import { fmt, mmss } from '../format.ts'
@@ -38,6 +38,12 @@ export function ResultOverlay() {
     .sort((a, b) => b.power * b.count - a.power * a.count)
     .slice(0, 8)
 
+  /**
+   * ボス戦の最中に時間切れになったときだけ、削り残しを見せる。
+   * 四捨五入するが、わずかでも残っていれば 0% とは表示しない。
+   */
+  const bossLeftPct = s.onBoss ? Math.max(1, Math.round((s.currentHp / bossHp(s.depth, cfg)) * 100)) : null
+
   return (
     <div className="overlay">
       <div className="modal">
@@ -47,6 +53,13 @@ export function ResultOverlay() {
           </div>
           <div className="modal-sub">{t.result.sub}</div>
         </div>
+
+        {bossLeftPct !== null && (
+          <div className="result-boss">
+            {fill(t.result.bossLeft, { name: s.bossName })}
+            <span className="num">{bossLeftPct}%</span>
+          </div>
+        )}
 
         <div className="result-grid">
           <div className="result-row">

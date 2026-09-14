@@ -1,4 +1,4 @@
-import { cachedPower, hasMutation, MUTATIONS, nameOfMask } from '../../game/mutations.ts'
+import { cachedPower, mutationsOfMask, nameOfMask } from '../../game/mutations.ts'
 import { bossHp, depthName } from '../../game/targets.ts'
 import { getConfig, getLastAward, setScreen } from '../../store/gameStore.ts'
 import { fill, t } from '../../text/index.ts'
@@ -23,8 +23,8 @@ export function ResultOverlay() {
     .map(([mask, count]) => ({
       mask,
       count,
-      power: cachedPower(mask, s.ranks, cfg, s.powerCache),
-      traits: MUTATIONS.filter((m) => hasMutation(mask, m)).length,
+      power: cachedPower(s.slots, mask, s.ranks, cfg, s.powerCache),
+      traits: mutationsOfMask(s.slots, mask).length,
     }))
     .sort((a, b) => b.traits - a.traits || b.power - a.power)[0]
 
@@ -32,7 +32,7 @@ export function ResultOverlay() {
     .map(([mask, count]) => ({
       mask,
       count,
-      power: cachedPower(mask, s.ranks, cfg, s.powerCache),
+      power: cachedPower(s.slots, mask, s.ranks, cfg, s.powerCache),
     }))
     .filter((x) => x.count >= 1)
     .sort((a, b) => b.power * b.count - a.power * a.count)
@@ -92,9 +92,9 @@ export function ResultOverlay() {
           <div className="champion">
             <div className="panel-title">{t.result.championTitle}</div>
             <div className="champion-body">
-              <SharkIcon mask={champion.mask} height={64} />
+              <SharkIcon mutations={mutationsOfMask(s.slots, champion.mask)} height={64} />
               <div className="champion-info">
-                <div className="champion-name">{nameOfMask(champion.mask)}</div>
+                <div className="champion-name">{nameOfMask(s.slots, champion.mask)}</div>
                 <div className="champion-stats">
                   {fill(t.result.championInfo, {
                     traits: champion.traits,
@@ -111,8 +111,8 @@ export function ResultOverlay() {
           <div className="panel-title">{t.result.speciesTitle}</div>
           {species.map((sp) => (
             <div key={sp.mask} className="stack">
-              <SharkIcon mask={sp.mask} height={30} />
-              <span className="stack-name">{nameOfMask(sp.mask)}</span>
+              <SharkIcon mutations={mutationsOfMask(s.slots, sp.mask)} height={30} />
+              <span className="stack-name">{nameOfMask(s.slots, sp.mask)}</span>
               <span className="stack-count">{fmt(sp.count)}</span>
               <span className="stack-power">{fmt(sp.power)}</span>
             </div>

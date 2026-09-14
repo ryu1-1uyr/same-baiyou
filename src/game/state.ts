@@ -7,8 +7,10 @@ import {
   type MutationId,
   type MutationMask,
   type MutationRanks,
+  type MutationSlots,
   type PowerCache,
   birthDistribution,
+  createSlots,
 } from './mutations.ts'
 import {
   EMPTY_POLICY_EFFECTS,
@@ -25,14 +27,14 @@ export type PendingDraft =
   { kind: 'mutation'; offers: MutationDef[] } | { kind: 'policy'; offers: PolicyDef[] }
 
 export type LogKind = 'hit' | 'boss' | 'depth' | 'draft' | 'policy' | 'system' | 'birth' | 'record'
-/** mask を持つ行は、その組み合わせのサメを添えて表示する */
-export type LogEntry = { t: number; kind: LogKind; text: string; mask?: MutationMask }
+/** mutations を持つ行は、その組み合わせのサメを添えて表示する */
+export type LogEntry = { t: number; kind: LogKind; text: string; mutations?: readonly MutationDef[] }
 
 /** ログの保持件数。表示に使うぶんだけあればよい */
 const LOG_LIMIT = 40
 
-export function pushLog(s: GameState, kind: LogKind, text: string, mask?: MutationMask): void {
-  s.log.unshift({ t: s.t, kind, text, mask })
+export function pushLog(s: GameState, kind: LogKind, text: string, mutations?: readonly MutationDef[]): void {
+  s.log.unshift({ t: s.t, kind, text, mutations })
   if (s.log.length > LOG_LIMIT) s.log.length = LOG_LIMIT
 }
 export type EndReason = 'timeout' | 'running'
@@ -51,6 +53,8 @@ export type GameState = {
   /** 累計出生数。在庫と違い減らない（実験記録として表示する） */
   births: Map<MutationMask, number>
   ranks: MutationRanks
+  /** このランで取った変異のビットの割り当て。在庫や出生の mask はこれで読む */
+  slots: MutationSlots
   /** ranks が変わるたびに作り直す出生分布のキャッシュ */
   birthDist: Array<[MutationMask, number]>
   /** このランで生まれた個体の、変異数の最高記録 */
@@ -121,6 +125,7 @@ export function createState(cfg: Config, seed: number, meta?: MetaEffects): Game
     inv: new Map(),
     births: new Map(),
     ranks: new Map<MutationId, number>(),
+    slots: createSlots(),
     birthDist: [[0, 1]],
     bestTraits: 0,
     launchedPerSec: 0,
@@ -162,7 +167,7 @@ export function createState(cfg: Config, seed: number, meta?: MetaEffects): Game
 }
 
 export function refreshBirthDist(s: GameState, cfg: Config): void {
-  s.birthDist = birthDistribution(s.ranks, cfg)
+  s.birthDist = birthDistribution(s.slots, s.ranks, cfg)
   // 戦闘力はランクが動いたときだけ変わる。ここで捨てれば次から積み直される
   s.powerCache.clear()
 }

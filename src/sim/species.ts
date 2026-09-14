@@ -29,7 +29,11 @@ for (const [label, draft] of [
   }
   console.log(`\n=== 実験記録 (${label} / 突破深度 ${s.clearedDepth}) ===\n`)
   const rows = [...s.births.entries()]
-    .map(([mask, count]) => ({ name: nameOfMask(mask), count, power: powerOfMask(mask, s.ranks, cfg) }))
+    .map(([mask, count]) => ({
+      name: nameOfMask(s.slots, mask),
+      count,
+      power: powerOfMask(s.slots, mask, s.ranks, cfg),
+    }))
     .sort((a, b) => b.power * b.count - a.power * a.count)
   for (const r of rows.slice(0, 10)) {
     console.log(

@@ -2,14 +2,14 @@ import type { Config } from './config.ts'
 import { BUILDINGS, BUILDING_INDEX } from './buildings.ts'
 import { addSharks, launchWeakest, totalSharks } from './inventory.ts'
 import {
-  hasMutation,
+  assignSlot,
   MUTATIONS,
   type MutationDef,
   type MutationId,
   type MutationMask,
-  maskOf,
   mutationName,
-  nameOfMask,
+  mutationsOfMask,
+  nameOfMutations,
   offerWeight,
   powerOfMask,
 } from './mutations.ts'
@@ -39,10 +39,8 @@ const LOG_TRAIT_SLACK = 3
 const LAUNCH_SMOOTH = 0.2
 
 /** その mask が持つ変異の数 */
-function traitCount(mask: MutationMask): number {
-  let n = 0
-  for (const m of MUTATIONS) if (hasMutation(mask, m)) n++
-  return n
+function traitCount(s: GameState, mask: MutationMask): number {
+  return mutationsOfMask(s.slots, mask).length
 }
 
 /**
@@ -50,15 +48,25 @@ function traitCount(mask: MutationMask): number {
  * **rare 以上を含み、かつ変異を 3 つ以上併せ持つ**個体だけを対象にする。
  * 条件を緩めると記録が誕生ログで埋まって、破壊や深度突破が読めなくなる。
  */
-function isNotable(mask: MutationMask): boolean {
+function isNotable(s: GameState, mask: MutationMask): boolean {
   let count = 0
   let hasRare = false
-  for (const m of MUTATIONS) {
-    if (!hasMutation(mask, m)) continue
+  for (const m of mutationsOfMask(s.slots, mask)) {
     count++
     if (m.rarity === 'rare' || m.rarity === 'legendary') hasRare = true
   }
   return hasRare && count >= 3
+}
+
+/** 生まれた個体を、その組み合わせのサメを添えて記録に残す */
+function logBirth(s: GameState, kind: 'birth' | 'record', mask: MutationMask): void {
+  const defs = mutationsOfMask(s.slots, mask)
+  pushLog(
+    s,
+    kind,
+    fill(kind === 'record' ? t.log.record : t.log.birth, { name: nameOfMutations(defs) }),
+    defs,
+  )
 }
 
 /** 設備の所持数 */
@@ -262,7 +270,7 @@ export function tick(s: GameState, input: TickInput, cfg: Config): void {
       s.births.set(mask, after)
       // 1 体目が生まれた瞬間だけ、珍しい個体を記録に残す
       if (before < 1 && after >= 1) {
-        const traits = traitCount(mask)
+        const traits = traitCount(s, mask)
         const record = traits > s.bestTraits
         if (record) s.bestTraits = traits
         /*
@@ -277,11 +285,11 @@ export function tick(s: GameState, input: TickInput, cfg: Config): void {
          */
         const owned = s.ranks.size
         if (owned < LOG_RECORD_FROM) {
-          if (isNotable(mask)) pushLog(s, 'birth', fill(t.log.birth, { name: nameOfMask(mask) }), mask)
+          if (isNotable(s, mask)) logBirth(s, 'birth', mask)
         } else if (record && traits >= 3) {
-          pushLog(s, 'record', fill(t.log.record, { name: nameOfMask(mask) }), mask)
+          logBirth(s, 'record', mask)
         } else if (traits >= owned - LOG_TRAIT_SLACK) {
-          pushLog(s, 'birth', fill(t.log.birth, { name: nameOfMask(mask) }), mask)
+          logBirth(s, 'birth', mask)
         }
       }
     }
@@ -319,7 +327,7 @@ export function tick(s: GameState, input: TickInput, cfg: Config): void {
 
   // --- 侵略 ---
   const n = launchRate(s, cfg) * dt
-  const { launched, damage } = launchWeakest(s.inv, n, s.ranks, cfg, s.powerCache)
+  const { launched, damage } = launchWeakest(s.inv, n, s.slots, s.ranks, cfg, s.powerCache)
   // 在庫が足りずに出しきれないことがあるので、実際に出た数をならして持っておく
   s.launchedPerSec += (launched / dt - s.launchedPerSec) * LAUNCH_SMOOTH
   // 検体の再利用: 投入した個体の一部が在庫へ戻る
@@ -370,7 +378,7 @@ function applyDamage(s: GameState, cfg: Config, damage: number): void {
 function finalVolley(s: GameState, cfg: Config): void {
   const all = totalSharks(s.inv)
   if (all <= 0) return
-  const { damage } = launchWeakest(s.inv, all, s.ranks, cfg, s.powerCache)
+  const { damage } = launchWeakest(s.inv, all, s.slots, s.ranks, cfg, s.powerCache)
   applyDamage(s, cfg, damage)
 }
 
@@ -394,14 +402,12 @@ export function applyDraft(s: GameState, cfg: Config, index: number): void {
 
   if (d.kind === 'mutation') {
     const chosen = d.offers[i]
+    assignSlot(s.slots, chosen)
     s.ranks.set(chosen.id, (s.ranks.get(chosen.id) ?? 0) + 1)
     refreshBirthDist(s, cfg)
-    pushLog(
-      s,
-      'draft',
-      fill(t.log.draft, { name: mutationName(chosen), rank: s.ranks.get(chosen.id)! }),
-      maskOf(chosen),
-    )
+    pushLog(s, 'draft', fill(t.log.draft, { name: mutationName(chosen), rank: s.ranks.get(chosen.id)! }), [
+      chosen,
+    ])
     s.draftCount += 1
     s.nextDraftAt +=
       cfg.mutation.draftThresholdBase *

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { MUTATION_BY_ID, maskOf, type MutationId } from '../../game/mutations.ts'
+import { MUTATION_BY_ID, type MutationDef, type MutationId } from '../../game/mutations.ts'
 import { pixelIcon } from '../../render/icons.ts'
 import { sharkBounds, sharkSprite } from '../../render/sharkSprite.ts'
 import { useAssetVersion } from '../useAssetVersion.ts'
@@ -24,20 +24,20 @@ export function Sprite({ kind, id, size = 22 }: { kind: SpriteKind; id: string; 
     if (!g) return
 
     // 変異と「検体」はサメのスプライトを流用する
-    let mask: number | null = null
+    let shark: MutationDef[] | null = null
     if (kind === 'mutation') {
       const def = MUTATION_BY_ID.get(id as MutationId)
-      if (def) mask = maskOf(def)
+      if (def) shark = [def]
     } else if (kind === 'resource' && id === 'shark') {
-      mask = 0
+      shark = []
     }
 
     g.imageSmoothingEnabled = false
 
-    if (mask !== null) {
+    if (shark !== null) {
       // サメは枠の余白を切り落としてから縮める
-      const src = sharkSprite(mask, 1)
-      const b = sharkBounds(mask, 1)
+      const src = sharkSprite(shark, 1)
+      const b = sharkBounds(shark, 1)
       const scale = size / b.h
       c.width = Math.max(1, Math.round(b.w * scale))
       c.height = Math.max(1, Math.round(size))

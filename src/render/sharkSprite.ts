@@ -1,6 +1,6 @@
-import type { MutationDef, MutationId, MutationMask } from '../game/mutations.ts'
+import type { MutationDef, MutationId } from '../game/mutations.ts'
 import { asset, drawLayer, onAssetLoaded } from './assets.ts'
-import { hasMutation, MUTATIONS } from '../game/mutations.ts'
+import { MUTATIONS } from '../game/mutations.ts'
 import {
   BODY_H,
   BODY_W,
@@ -491,16 +491,35 @@ const cache = new Map<string, HTMLCanvasElement>()
  */
 const CACHE_LIMIT = 256
 
+const keyOf = new WeakMap<readonly MutationDef[], string>()
+
 /**
- * 変異の組み合わせからスプライトを作る。結果は mask 単位でキャッシュする。
+ * 組み合わせのキャッシュキー。変異 id を定義順に連結する。
+ *
+ * mask はランごとにビットの割り当てが変わり、ランをまたぐと別のサメを指すので使えない。
+ * 同じ配列が毎フレーム渡される（突撃ビュワー）ため、配列ごとに覚えておく。
+ */
+export function spriteKey(defs: readonly MutationDef[]): string {
+  const hit = keyOf.get(defs)
+  if (hit !== undefined) return hit
+  const key = MUTATIONS.filter((m) => defs.includes(m))
+    .map((m) => m.id)
+    .join('+')
+  keyOf.set(defs, key)
+  return key
+}
+
+/**
+ * 変異の組み合わせからスプライトを作る。結果は組み合わせ単位でキャッシュする。
  * scale は論理ピクセル 1 つを何 px で描くか。
  */
-export function sharkSprite(mask: MutationMask, scale = 1): HTMLCanvasElement {
-  const key = `${mask}@${scale}`
+export function sharkSprite(mutations: readonly MutationDef[], scale = 1): HTMLCanvasElement {
+  const key = `${spriteKey(mutations)}@${scale}`
   const hit = cache.get(key)
   if (hit) return hit
 
-  const defs: MutationDef[] = MUTATIONS.filter((m) => hasMutation(mask, m))
+  // 部位の取り合いや塗り分けの順が渡し方に左右されないよう、定義順にそろえる
+  const defs: MutationDef[] = MUTATIONS.filter((m) => mutations.includes(m))
 
   // --- チャンネルごとに集約 ---
   const parts = new Map<PartSlot, { id: MutationId; part: NonNullable<Visual['part']> }>()
@@ -583,8 +602,8 @@ export function sharkSprite(mask: MutationMask, scale = 1): HTMLCanvasElement {
 }
 
 /** 在庫やリザルトなど、DOM に画像として置きたい場所向け */
-export function sharkDataUrl(mask: MutationMask, scale = 2): string {
-  return sharkSprite(mask, scale).toDataURL()
+export function sharkDataUrl(mutations: readonly MutationDef[], scale = 2): string {
+  return sharkSprite(mutations, scale).toDataURL()
 }
 
 // 画像が後から読み込まれたら、合成済みのキャッシュを捨てて描き直させる
@@ -596,11 +615,14 @@ onAssetLoaded(() => {
 /** 合成結果の不透明な範囲。アイコン表示で余白を切り落とすのに使う */
 const boundsCache = new Map<string, { x: number; y: number; w: number; h: number }>()
 
-export function sharkBounds(mask: MutationMask, scale = 1): { x: number; y: number; w: number; h: number } {
-  const key = `${mask}@${scale}`
+export function sharkBounds(
+  mutations: readonly MutationDef[],
+  scale = 1,
+): { x: number; y: number; w: number; h: number } {
+  const key = `${spriteKey(mutations)}@${scale}`
   const hit = boundsCache.get(key)
   if (hit) return hit
-  const c = sharkSprite(mask, scale)
+  const c = sharkSprite(mutations, scale)
   const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data
   let x0 = c.width,
     y0 = c.height,

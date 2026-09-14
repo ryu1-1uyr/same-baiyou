@@ -1,4 +1,11 @@
-import { cachedPower, MUTATIONS, mutationName, nameOfMask, rateAt } from '../../game/mutations.ts'
+import {
+  cachedPower,
+  MUTATIONS,
+  mutationName,
+  mutationsOfMask,
+  nameOfMask,
+  rateAt,
+} from '../../game/mutations.ts'
 import { totalSharks } from '../../game/inventory.ts'
 import { getConfig } from '../../store/gameStore.ts'
 import { fmt } from '../format.ts'
@@ -43,7 +50,11 @@ export function StockPanel() {
   for (const [mask, born] of s.births) {
     if (born < 1) continue
     speciesCount++
-    const row = { mask, count: s.inv.get(mask) ?? 0, power: cachedPower(mask, s.ranks, cfg, s.powerCache) }
+    const row = {
+      mask,
+      count: s.inv.get(mask) ?? 0,
+      power: cachedPower(s.slots, mask, s.ranks, cfg, s.powerCache),
+    }
     if (shown.length < VISIBLE) {
       insert(shown, row)
     } else if (better(row, shown[VISIBLE - 1])) {
@@ -86,8 +97,8 @@ export function StockPanel() {
         ) : (
           shown.map((st) => (
             <div key={st.mask} className="stack" data-empty={st.count < 1}>
-              <SharkIcon mask={st.mask} height={26} />
-              <span className="stack-name">{nameOfMask(st.mask)}</span>
+              <SharkIcon mutations={mutationsOfMask(s.slots, st.mask)} height={26} />
+              <span className="stack-name">{nameOfMask(s.slots, st.mask)}</span>
               <span className="stack-count">{fmt(st.count)}</span>
               <span className="stack-power">{fmt(st.power)}</span>
             </div>

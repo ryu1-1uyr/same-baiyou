@@ -54,34 +54,71 @@ export type MutationMask = number
 /**
  * 在庫のキーは「変異ごとのビットを立てた整数」で持つ。
  *
- * ビット演算子（`1 << bit`）は 32bit 符号付きに丸められるため 31 種で頭打ちになる。
- * そこで `2 ** bit` の算術で扱う。JS の数値は 2^53 まで整数を正確に表せるので、
- * **変異は最大 53 種**まで増やせる。Map のキーも数値のままなので速度は変わらない。
+ * ビット演算子（`1 << bit`）は 32bit 符号付きに丸められるため、`2 ** bit` の算術で扱う。
+ * JS の数値は 2^53 まで整数を正確に表せるので、1 つの mask に載せられる変異は 53 種まで。
  *
- * ビット操作は maskOf / hasMutation / addMutation に閉じてあるので、
- * さらに増やしたくなった場合もここだけ差し替えればよい。
+ * **ビットは変異ごとに固定せず、ランの中で取った順に割り当てる**（MutationSlots）。
+ * 1 ランで取れる変異はドラフトの回数までなので 53 ビットで足り、
+ * 変異の総数そのものには上限が無くなる。
+ * そのぶん mask だけでは中身が決まらないので、読むときは必ずそのランの割り当て表を渡す。
  */
-export const MAX_MUTATIONS = 53
+export const MAX_SLOTS = 53
 
-/** その変異 1 つぶんのマスク */
-export function maskOf(def: { bit: number }): MutationMask {
-  return Math.pow(2, def.bit)
+/** そのランで取った変異に振ったビットの対応表 */
+export type MutationSlots = {
+  /** ビットの位置 → 変異。取った順に並ぶ */
+  bySlot: MutationDef[]
+  slotOf: Map<MutationId, number>
+  /** mask → 含まれる変異（定義順）。同じ mask には同じ配列を返す */
+  defsOf: Map<MutationMask, readonly MutationDef[]>
+}
+
+export function createSlots(): MutationSlots {
+  return { bySlot: [], slotOf: new Map(), defsOf: new Map() }
+}
+
+/** 変異にビットを割り当てる。割り当て済みなら何もしない */
+export function assignSlot(slots: MutationSlots, def: MutationDef): void {
+  if (slots.slotOf.has(def.id)) return
+  if (slots.bySlot.length >= MAX_SLOTS) {
+    throw new Error(`1 ランで扱える変異は ${MAX_SLOTS} 種まで（在庫キーがビットマスクのため）`)
+  }
+  slots.slotOf.set(def.id, slots.bySlot.length)
+  slots.bySlot.push(def)
+}
+
+/** その変異 1 つぶんのマスク。割り当て前の変異は渡さない */
+export function maskOf(slots: MutationSlots, def: MutationDef): MutationMask {
+  const slot = slots.slotOf.get(def.id)
+  if (slot === undefined) throw new Error(`変異 ${def.id} にビットが割り当てられていない`)
+  return Math.pow(2, slot)
 }
 
 /** マスクにその変異が含まれるか */
-export function hasMutation(mask: MutationMask, def: { bit: number }): boolean {
-  return Math.floor(mask / Math.pow(2, def.bit)) % 2 === 1
+export function hasMutation(slots: MutationSlots, mask: MutationMask, def: MutationDef): boolean {
+  const slot = slots.slotOf.get(def.id)
+  return slot !== undefined && Math.floor(mask / Math.pow(2, slot)) % 2 === 1
 }
 
 /** マスクに変異を足す（既に含まれていれば何もしない） */
-export function addMutation(mask: MutationMask, def: { bit: number }): MutationMask {
-  return hasMutation(mask, def) ? mask : mask + maskOf(def)
+function addMutation(slots: MutationSlots, mask: MutationMask, def: MutationDef): MutationMask {
+  return hasMutation(slots, mask, def) ? mask : mask + maskOf(slots, def)
+}
+
+/**
+ * mask に含まれる変異を**定義順**で返す。
+ * 名前の接頭辞の並びと倍率を掛ける順を、取った順に左右されないようにするため。
+ */
+export function mutationsOfMask(slots: MutationSlots, mask: MutationMask): readonly MutationDef[] {
+  const hit = slots.defsOf.get(mask)
+  if (hit) return hit
+  const defs = MUTATIONS.filter((m) => hasMutation(slots, mask, m))
+  slots.defsOf.set(mask, defs)
+  return defs
 }
 
 export type MutationDef = {
   id: MutationId
-  /** ビットマスク上の位置 */
-  bit: number
   /** ランク 1 の発現率 */
   baseRate: number
   /** ランク 1 の戦闘力倍率 */
@@ -98,51 +135,47 @@ export type MutationDef = {
 // prettier-ignore
 export const MUTATIONS: MutationDef[] = [
   // --- 生体系（初期から出る） ---
-  { id: 'glow',        bit: 0,   baseRate: 0.18,    basePower: 5,      rarity: 'common',     family: 'bio' },
-  { id: 'frenzy',      bit: 1,   baseRate: 0.15,    basePower: 4,      rarity: 'common',     family: 'bio' },
-  { id: 'swift',       bit: 2,   baseRate: 0.16,    basePower: 6,      rarity: 'common',     family: 'bio' },
-  { id: 'albino',      bit: 3,   baseRate: 0.12,    basePower: 10,     rarity: 'common',     family: 'bio' },
-  { id: 'spike',       bit: 4,   baseRate: 0.13,    basePower: 9,      rarity: 'common',     family: 'bio' },
-  { id: 'poison',      bit: 5,   baseRate: 0.08,    basePower: 30,     rarity: 'uncommon',   family: 'bio' },
-  { id: 'twinHead',    bit: 6,   baseRate: 0.10,    basePower: 8,      rarity: 'common',     family: 'bio' },
-  { id: 'tripleHead',  bit: 7,   baseRate: 0.05,    basePower: 85,     rarity: 'rare',       family: 'bio' },
-  { id: 'swarm',       bit: 8,   baseRate: 0.12,    basePower: 6,      rarity: 'common',     family: 'bio' },
-  { id: 'triple',      bit: 9,   baseRate: 0.07,    basePower: 20,     rarity: 'uncommon',   family: 'bio' },
-  { id: 'giant',       bit: 10,  baseRate: 0.08,    basePower: 25,     rarity: 'uncommon',   family: 'bio' },
-  { id: 'fungus',      bit: 11,  baseRate: 0.08,    basePower: 28,     rarity: 'uncommon',   family: 'bio' },
-  { id: 'ghost',       bit: 12,  baseRate: 0.05,    basePower: 95,     rarity: 'rare',       family: 'bio' },
-  { id: 'zombie',      bit: 13,  baseRate: 0.05,    basePower: 110,    rarity: 'rare',       family: 'bio' },
-  { id: 'ancient',     bit: 14,  baseRate: 0.03,    basePower: 420,    rarity: 'legendary',  family: 'bio' },
+  { id: 'glow',        baseRate: 0.18,    basePower: 5,      rarity: 'common',     family: 'bio' },
+  { id: 'frenzy',      baseRate: 0.15,    basePower: 4,      rarity: 'common',     family: 'bio' },
+  { id: 'swift',       baseRate: 0.16,    basePower: 6,      rarity: 'common',     family: 'bio' },
+  { id: 'albino',      baseRate: 0.12,    basePower: 10,     rarity: 'common',     family: 'bio' },
+  { id: 'spike',       baseRate: 0.13,    basePower: 9,      rarity: 'common',     family: 'bio' },
+  { id: 'poison',      baseRate: 0.08,    basePower: 30,     rarity: 'uncommon',   family: 'bio' },
+  { id: 'twinHead',    baseRate: 0.10,    basePower: 8,      rarity: 'common',     family: 'bio' },
+  { id: 'tripleHead',  baseRate: 0.05,    basePower: 85,     rarity: 'rare',       family: 'bio' },
+  { id: 'swarm',       baseRate: 0.12,    basePower: 6,      rarity: 'common',     family: 'bio' },
+  { id: 'triple',      baseRate: 0.07,    basePower: 20,     rarity: 'uncommon',   family: 'bio' },
+  { id: 'giant',       baseRate: 0.08,    basePower: 25,     rarity: 'uncommon',   family: 'bio' },
+  { id: 'fungus',      baseRate: 0.08,    basePower: 28,     rarity: 'uncommon',   family: 'bio' },
+  { id: 'ghost',       baseRate: 0.05,    basePower: 95,     rarity: 'rare',       family: 'bio' },
+  { id: 'zombie',      baseRate: 0.05,    basePower: 110,    rarity: 'rare',       family: 'bio' },
+  { id: 'ancient',     baseRate: 0.03,    basePower: 420,    rarity: 'legendary',  family: 'bio' },
 
   // --- 深海系 ---
-  { id: 'pressure',    bit: 15,  baseRate: 0.09,    basePower: 30,     rarity: 'uncommon',   family: 'abyss' },
-  { id: 'abyss',       bit: 16,  baseRate: 0.05,    basePower: 90,     rarity: 'rare',       family: 'abyss' },
-  { id: 'tentacle',    bit: 17,  baseRate: 0.05,    basePower: 130,    rarity: 'rare',       family: 'abyss' },
-  { id: 'eldritch',    bit: 18,  baseRate: 0.03,    basePower: 450,    rarity: 'legendary',  family: 'abyss' },
+  { id: 'pressure',    baseRate: 0.09,    basePower: 30,     rarity: 'uncommon',   family: 'abyss' },
+  { id: 'abyss',       baseRate: 0.05,    basePower: 90,     rarity: 'rare',       family: 'abyss' },
+  { id: 'tentacle',    baseRate: 0.05,    basePower: 130,    rarity: 'rare',       family: 'abyss' },
+  { id: 'eldritch',    baseRate: 0.03,    basePower: 450,    rarity: 'legendary',  family: 'abyss' },
 
   // --- 機械系 ---
-  { id: 'armor',       bit: 19,  baseRate: 0.10,    basePower: 18,     rarity: 'uncommon',   family: 'mech' },
-  { id: 'mecha',       bit: 20,  baseRate: 0.05,    basePower: 60,     rarity: 'rare',       family: 'mech' },
-  { id: 'volt',        bit: 21,  baseRate: 0.05,    basePower: 120,    rarity: 'rare',       family: 'mech' },
-  { id: 'autonomous',  bit: 22,  baseRate: 0.03,    basePower: 400,    rarity: 'legendary',  family: 'mech' },
+  { id: 'armor',       baseRate: 0.10,    basePower: 18,     rarity: 'uncommon',   family: 'mech' },
+  { id: 'mecha',       baseRate: 0.05,    basePower: 60,     rarity: 'rare',       family: 'mech' },
+  { id: 'volt',        baseRate: 0.05,    basePower: 120,    rarity: 'rare',       family: 'mech' },
+  { id: 'autonomous',  baseRate: 0.03,    basePower: 400,    rarity: 'legendary',  family: 'mech' },
 
   // --- 宇宙系 ---
-  { id: 'zeroG',       bit: 23,  baseRate: 0.10,    basePower: 20,     rarity: 'uncommon',   family: 'cosmic' },
-  { id: 'meteor',      bit: 24,  baseRate: 0.05,    basePower: 100,    rarity: 'rare',       family: 'cosmic' },
-  { id: 'cosmic',      bit: 25,  baseRate: 0.03,    basePower: 350,    rarity: 'legendary',  family: 'cosmic' },
-  { id: 'alien',       bit: 26,  baseRate: 0.03,    basePower: 500,    rarity: 'legendary',  family: 'cosmic' },
+  { id: 'zeroG',       baseRate: 0.10,    basePower: 20,     rarity: 'uncommon',   family: 'cosmic' },
+  { id: 'meteor',      baseRate: 0.05,    basePower: 100,    rarity: 'rare',       family: 'cosmic' },
+  { id: 'cosmic',      baseRate: 0.03,    basePower: 350,    rarity: 'legendary',  family: 'cosmic' },
+  { id: 'alien',       baseRate: 0.03,    basePower: 500,    rarity: 'legendary',  family: 'cosmic' },
 
   // --- 災害系 ---
-  { id: 'tornado',     bit: 27,  baseRate: 0.09,    basePower: 22,     rarity: 'uncommon',   family: 'disaster' },
-  { id: 'magma',       bit: 28,  baseRate: 0.08,    basePower: 32,     rarity: 'uncommon',   family: 'disaster' },
-  { id: 'frozen',      bit: 29,  baseRate: 0.05,    basePower: 105,    rarity: 'rare',       family: 'disaster' },
-  { id: 'storm',       bit: 30,  baseRate: 0.05,    basePower: 120,    rarity: 'rare',       family: 'disaster' },
-  { id: 'tsunami',     bit: 31,  baseRate: 0.03,    basePower: 430,    rarity: 'legendary',  family: 'disaster' },
+  { id: 'tornado',     baseRate: 0.09,    basePower: 22,     rarity: 'uncommon',   family: 'disaster' },
+  { id: 'magma',       baseRate: 0.08,    basePower: 32,     rarity: 'uncommon',   family: 'disaster' },
+  { id: 'frozen',      baseRate: 0.05,    basePower: 105,    rarity: 'rare',       family: 'disaster' },
+  { id: 'storm',       baseRate: 0.05,    basePower: 120,    rarity: 'rare',       family: 'disaster' },
+  { id: 'tsunami',     baseRate: 0.03,    basePower: 430,    rarity: 'legendary',  family: 'disaster' },
 ]
-
-if (MUTATIONS.length > MAX_MUTATIONS) {
-  throw new Error(`変異は ${MAX_MUTATIONS} 種までしか扱えない（在庫キーがビットマスクのため）`)
-}
 
 /**
  * 生産数 P におけるドラフト出現の重み。
@@ -177,11 +210,15 @@ export type MutationRanks = Map<MutationId, number>
  * サメ 1 体の戦闘力。持っている変異の倍率をすべて掛け合わせる。
  * mask から一意に決まるので、在庫スタックに戦闘力を保存しなくてもよい。
  */
-export function powerOfMask(mask: MutationMask, ranks: MutationRanks, cfg: Config, powerMult = 1): number {
+export function powerOfMask(
+  slots: MutationSlots,
+  mask: MutationMask,
+  ranks: MutationRanks,
+  cfg: Config,
+  powerMult = 1,
+): number {
   let p = cfg.shark.basePower * powerMult
-  for (const def of MUTATIONS) {
-    if (hasMutation(mask, def)) p *= powerAt(def, ranks.get(def.id) ?? 0, cfg)
-  }
+  for (const def of mutationsOfMask(slots, mask)) p *= powerAt(def, ranks.get(def.id) ?? 0, cfg)
   return p
 }
 
@@ -195,6 +232,7 @@ export function powerOfMask(mask: MutationMask, ranks: MutationRanks, cfg: Confi
 export type PowerCache = Map<MutationMask, number>
 
 export function cachedPower(
+  slots: MutationSlots,
   mask: MutationMask,
   ranks: MutationRanks,
   cfg: Config,
@@ -202,7 +240,7 @@ export function cachedPower(
 ): number {
   const hit = cache.get(mask)
   if (hit !== undefined) return hit
-  const v = powerOfMask(mask, ranks, cfg)
+  const v = powerOfMask(slots, mask, ranks, cfg)
   cache.set(mask, v)
   return v
 }
@@ -234,7 +272,11 @@ export const DIST_KEEP_STRONG = 1024
  * 掛かるだけなので、途中の p と p*戦闘力 で順位を付ければ
  * 最終的な寄与の順位と一致する。
  */
-export function birthDistribution(ranks: MutationRanks, cfg: Config): Array<[MutationMask, number]> {
+export function birthDistribution(
+  slots: MutationSlots,
+  ranks: MutationRanks,
+  cfg: Config,
+): Array<[MutationMask, number]> {
   const cap = DIST_KEEP_COMMON + DIST_KEEP_STRONG
   // [mask, 確率, 戦闘力]。戦闘力は間引きの順位付けにだけ使う
   let dist: Array<[MutationMask, number, number]> = [[0, 1, cfg.shark.basePower]]
@@ -246,7 +288,7 @@ export function birthDistribution(ranks: MutationRanks, cfg: Config): Array<[Mut
     const next: Array<[MutationMask, number, number]> = []
     for (const [mask, prob, pw] of dist) {
       if (prob * (1 - p) > 0) next.push([mask, prob * (1 - p), pw])
-      if (prob * p > 0) next.push([addMutation(mask, def), prob * p, pw * mult])
+      if (prob * p > 0) next.push([addMutation(slots, mask, def), prob * p, pw * mult])
     }
     dist = next.length > cap ? prune(next) : next
   }
@@ -298,8 +340,12 @@ export function expectedPower(ranks: MutationRanks, cfg: Config, powerMult = 1):
   return e
 }
 
-/** 複合サメの名前。変異 ID の定義順に接頭辞を連結するだけ */
-export function nameOfMask(mask: MutationMask): string {
-  const parts = MUTATIONS.filter((m) => hasMutation(mask, m)).map((m) => t.mutation[m.id].prefix)
+/** 複合サメの名前。渡された変異（定義順）の接頭辞を連結するだけ */
+export function nameOfMutations(defs: readonly MutationDef[]): string {
+  const parts = defs.map((m) => t.mutation[m.id].prefix)
   return parts.length === 0 ? t.shark.plain : parts.join('') + t.shark.suffix
+}
+
+export function nameOfMask(slots: MutationSlots, mask: MutationMask): string {
+  return nameOfMutations(mutationsOfMask(slots, mask))
 }

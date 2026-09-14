@@ -19,7 +19,7 @@ export function TitleScreen() {
   return (
     <div className="title">
       <div className="title-logo">
-        <SharkIcon mask={0} height={96} />
+        <SharkIcon mutations={[]} height={96} />
         <h1 className="title-name">{t.app.title}</h1>
       </div>
 

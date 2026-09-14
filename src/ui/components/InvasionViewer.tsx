@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { sortedByPower, totalSharks } from '../../game/inventory.ts'
-import { cachedPower } from '../../game/mutations.ts'
+import { cachedPower, type MutationDef, mutationsOfMask } from '../../game/mutations.ts'
 import { pixelIcon } from '../../render/icons.ts'
 import { sharkSprite } from '../../render/sharkSprite.ts'
 import { getConfig, getSpeed, getState } from '../../store/gameStore.ts'
@@ -121,13 +121,17 @@ function tiersFor(rate: number, maxScale: number): Tier[] {
  * 大きい階層ほど戦闘力の高い側から引く。束ねた中の代表として不自然ではないし、
  * 「大きいサメほど珍しい」という読み方ができる。
  */
-function pickMask(palette: number[], tier: number, tierCount: number): number {
-  if (palette.length === 0) return 0
+function pickMask(palette: Shark[], tier: number, tierCount: number): Shark {
+  if (palette.length === 0) return PLAIN
   const band = 1 / Math.max(1, tierCount)
   const lo = (Math.max(1, tierCount) - 1 - tier) * band
   const frac = lo + Math.random() * band
   return palette[Math.min(palette.length - 1, Math.floor(frac * palette.length))]
 }
+
+/** 流すサメ 1 体の見た目。ランをまたいでも崩れないよう、mask ではなく変異の並びで持つ */
+type Shark = readonly MutationDef[]
+const PLAIN: Shark = []
 
 type P = {
   x: number
@@ -138,7 +142,7 @@ type P = {
   vrot: number
   alpha: number
   bounced: boolean
-  mask: number
+  mutations: Shark
   /** 束ねた数に応じた大きさ。湧いた時点の値を保つ */
   scale: number
 }
@@ -171,24 +175,31 @@ const PALETTE_WEIGHT_EXP = 0.5
  * 戻り値は戦闘力の昇順。湧かせる側が、大きい階層ほど後ろ（強い側）から
  * 引くことで、大きいサメほど珍しい見た目になる。
  */
-function launchingPalette(): number[] {
+function launchingPalette(): Shark[] {
   const s = getState()
   const cfg = getConfig()
 
   const rows =
     totalSharks(s.inv) > 0
-      ? sortedByPower(s.inv, s.ranks, cfg, s.powerCache).map((r) => ({ mask: r.mask, weight: r.count }))
+      ? sortedByPower(s.inv, s.slots, s.ranks, cfg, s.powerCache).map((r) => ({
+          mask: r.mask,
+          weight: r.count,
+        }))
       : s.birthDist
-          .map(([mask, p]) => ({ mask, weight: p, power: cachedPower(mask, s.ranks, cfg, s.powerCache) }))
+          .map(([mask, p]) => ({
+            mask,
+            weight: p,
+            power: cachedPower(s.slots, mask, s.ranks, cfg, s.powerCache),
+          }))
           .sort((a, b) => a.power - b.power)
-  if (rows.length === 0) return [0]
+  if (rows.length === 0) return [PLAIN]
 
   const weights = rows.map((r) => Math.pow(r.weight, PALETTE_WEIGHT_EXP))
   let sum = 0
   for (const w of weights) sum += w
-  if (sum <= 0) return [0]
+  if (sum <= 0) return [PLAIN]
 
-  const out: number[] = []
+  const out: Shark[] = []
   let acc = 0
   let i = 0
   for (let k = 0; k < PALETTE_SIZE; k++) {
@@ -198,7 +209,7 @@ function launchingPalette(): number[] {
       acc += weights[i]
       i++
     }
-    out.push(rows[i].mask)
+    out.push(mutationsOfMask(s.slots, rows[i].mask))
   }
   return out
 }
@@ -236,7 +247,7 @@ export function InvasionViewer() {
 
     let last = performance.now()
     let flash = 0
-    let palette: number[] = [0]
+    let palette: Shark[] = [PLAIN]
     let keyAge = 0
     let raf = 0
 
@@ -285,7 +296,7 @@ export function InvasionViewer() {
               vrot: 0,
               alpha: 1,
               bounced: false,
-              mask: pickMask(palette, i, tiers.length),
+              mutations: pickMask(palette, i, tiers.length),
               scale: tier.scale,
             })
           }
@@ -349,7 +360,7 @@ export function InvasionViewer() {
 
       // サメ
       for (const p of parts) {
-        const img = sharkSprite(p.mask, 1)
+        const img = sharkSprite(p.mutations, 1)
         const sH = SHARK_H * p.scale
         const w = (img.width / img.height) * sH
         if (p.bounced) {

@@ -1,6 +1,7 @@
 import { BUILDINGS, type BuildingDef, costOf } from '../game/buildings.ts'
-import { claimReward, discover } from '../game/codex.ts'
+import { claimReward, type CodexId, discover, revealHints } from '../game/codex.ts'
 import { type Config, DEFAULT_CONFIG } from '../game/config.ts'
+import { RECIPE_RANK } from '../game/derived.ts'
 import {
   applyMetaToConfig,
   budgetFor,
@@ -12,9 +13,18 @@ import {
   NUMERIC_UPGRADES,
   UNLOCKS,
 } from '../game/meta.ts'
-import type { MutationId } from '../game/mutations.ts'
-import { createState, type GameState } from '../game/state.ts'
-import { applyDraft, clickValue, critChance, critMult, rerollDraft, tick } from '../game/tick.ts'
+import { mutationName } from '../game/mutations.ts'
+import { createState, type GameState, pushLog } from '../game/state.ts'
+import {
+  applyDerived,
+  applyDraft,
+  clickValue,
+  critChance,
+  critMult,
+  rerollDraft,
+  tick,
+} from '../game/tick.ts'
+import { fill, t } from '../text/index.ts'
 import { loadMeta, resetMeta, saveMeta } from '../meta/save.ts'
 
 /**
@@ -110,7 +120,7 @@ export function setCodexOpen(v: boolean): void {
 }
 
 /** 図鑑で原種の研究予算を受け取る */
-export function claimCodexReward(id: MutationId): void {
+export function claimCodexReward(id: CodexId): void {
   if (claimReward(meta, id) > 0) {
     saveMeta(meta)
     emit()
@@ -244,11 +254,31 @@ export function reroll(): void {
 
 export function chooseDraft(index: number): void {
   applyDraft(state, cfg, index)
-  // 初めて取った変異を図鑑に載せる。方針のドラフトでは ranks が変わらないので何も起きない
-  let found = false
-  for (const id of state.ranks.keys()) if (discover(meta, id)) found = true
-  if (found) saveMeta(meta)
+  recordCodex()
   emit()
+}
+
+/** 提示中の派生種のカードを取る */
+export function chooseDerived(index: number): void {
+  applyDerived(state, cfg, index)
+  recordCodex()
+  emit()
+}
+
+/**
+ * ドラフトの結果を図鑑に反映する。
+ * 初めて取った変異・派生種を載せ、材料が条件のランクに届いたら派生種のヒントを開く。
+ * 方針のドラフトでは ranks も派生種も変わらないので何も起きない。
+ */
+function recordCodex(): void {
+  let changed = false
+  for (const id of state.ranks.keys()) if (discover(meta, id)) changed = true
+  for (const def of state.slots.fused) if (discover(meta, def.id)) changed = true
+  for (const m of revealHints(meta, state.ranks, state.meta.derivedTier)) {
+    pushLog(state, 'system', fill(t.log.hint, { material: mutationName(m), rank: RECIPE_RANK }))
+    changed = true
+  }
+  if (changed) saveMeta(meta)
 }
 
 export function startNewRun(): void {

@@ -579,6 +579,17 @@
   font-size: var(--fs-xs);
   letter-spacing: 0.1em;
 }
+/* 派生種は条件を満たした報酬。変異とも方針とも違う色で、光らせて目を引く */
+.card[data-kind='derived'] {
+  border-left: 3px solid var(--c-boss);
+  background: linear-gradient(180deg, #ff7ab01f, var(--c-bg-deep) 45%);
+  box-shadow: 0 0 14px 0 color-mix(in srgb, var(--c-boss) 30%, transparent);
+}
+.card[data-kind='derived'] .card-rarity,
+.card[data-kind='derived'] .card-upgrade {
+  color: var(--c-boss);
+}
+
 /* 研究方針は施設側の選択。変異と一目で区別が付くよう、色と縁の出方を変える */
 .card[data-kind='policy'] {
   border-left: 3px solid var(--c-culture);
@@ -1993,4 +2004,24 @@
 }
 .codex-claimed {
   color: var(--c-text-mute);
+}
+.codex-entry[data-derived='true'] {
+  border-left-color: var(--c-boss);
+}
+.codex-recipe {
+  grid-area: rarity;
+  font-size: var(--fs-xs);
+  color: var(--c-text-dim);
+}
+.codex-entry[data-locked='true'] {
+  opacity: 0.55;
+}
+.codex-entry[data-found='false'][data-derived='true'] {
+  grid-template-areas:
+    'icon name'
+    'icon rarity';
+}
+/* ドラフトが出ている最中に図鑑を開いても隠れないよう、図鑑を上に重ねる */
+.overlay:has(> .codex) {
+  z-index: 20;
 }

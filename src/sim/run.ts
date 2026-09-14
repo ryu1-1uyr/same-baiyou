@@ -5,7 +5,7 @@ import { MUTATION_BY_ID, type MutationId, expectedPower, nameOfMask, powerOfMask
 import { mutationName } from '../game/mutations.ts'
 import { applyMetaToConfig, createMeta, type MetaState, metaEffects } from '../game/meta.ts'
 import { createState, type GameState } from '../game/state.ts'
-import { applyDraft, clickEV, clickValue, cultureRate, tick } from '../game/tick.ts'
+import { applyDerived, applyDraft, clickEV, clickValue, cultureRate, tick } from '../game/tick.ts'
 import { autoBuy, BUY_RATIOS, type DraftPolicyName, makeDraftChooser, pickPolicy } from './policy.ts'
 
 export type SimOptions = {
@@ -43,6 +43,29 @@ function pickDraft(s: GameState, cfg: Config, chooser: ReturnType<typeof makeDra
   return d.kind === 'mutation' ? chooser(d.offers, s, cfg) : pickPolicy(d.offers)
 }
 
+/**
+ * 派生種のカードを取るか。取るならその添字、取らないなら -1。
+ * 取った後の期待戦闘力が、変異の側で選ぶ 1 枚を取った場合以上なら取る。
+ */
+function pickDerived(s: GameState, cfg: Config, chooser: ReturnType<typeof makeDraftChooser>): number {
+  const d = s.pendingDraft!
+  if (d.kind !== 'mutation' || d.derived.length === 0) return -1
+  let best = -1
+  let bestEv = -Infinity
+  d.derived.forEach((def, i) => {
+    const ev = expectedPower(s.ranks, cfg, 1, [...s.slots.fused, def])
+    if (ev > bestEv) {
+      bestEv = ev
+      best = i
+    }
+  })
+  if (d.offers.length === 0) return best
+  const pick = d.offers[chooser(d.offers, s, cfg)]
+  const trial = new Map(s.ranks)
+  trial.set(pick.id, (trial.get(pick.id) ?? 0) + 1)
+  return bestEv >= expectedPower(trial, cfg, 1, s.slots.fused) ? best : -1
+}
+
 export function simulate(opts: SimOptions = {}): SimResult {
   const meta = opts.meta ?? createMeta()
   const eff = metaEffects(meta)
@@ -56,7 +79,11 @@ export function simulate(opts: SimOptions = {}): SimResult {
 
   while (s.phase !== 'over' && s.t < maxT) {
     tick(s, input, cfg)
-    if (s.pendingDraft) applyDraft(s, cfg, pickDraft(s, cfg, chooser))
+    if (s.pendingDraft) {
+      const derived = pickDerived(s, cfg, chooser)
+      if (derived >= 0) applyDerived(s, cfg, derived)
+      else applyDraft(s, cfg, pickDraft(s, cfg, chooser))
+    }
     // 購入判断は 1 秒に 1 回で十分（毎ティック回すと無駄が大きい）
     if (Math.round(s.t / dt) % cfg.tickHz === 0)
       autoBuy(s, cfg, ratio, cultureRate(s) + clickEV(s, cfg) * input.clicksPerSec)
@@ -78,7 +105,7 @@ export function simulate(opts: SimOptions = {}): SimResult {
     score: s.score,
     produced: s.producedTotal,
     leftover: totalSharks(s.inv),
-    expPower: expectedPower(s.ranks, cfg),
+    expPower: expectedPower(s.ranks, cfg, 1, s.slots.fused),
     draftCount: s.draftCount,
     rankIds: [...s.ranks.keys()],
     ranks: [...s.ranks.entries()].map(([id, r]) => `${mutationName(MUTATION_BY_ID.get(id)!)}R${r}`).join(' '),

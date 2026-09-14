@@ -1,6 +1,6 @@
-import type { MutationDef, MutationId } from '../game/mutations.ts'
+import type { MutationDef, MutationId, SharkPart } from '../game/mutations.ts'
 import { asset, drawLayer, onAssetLoaded } from './assets.ts'
-import { MUTATIONS } from '../game/mutations.ts'
+import { isDerived, MUTATIONS } from '../game/mutations.ts'
 import {
   BODY_H,
   BODY_W,
@@ -491,7 +491,7 @@ const cache = new Map<string, HTMLCanvasElement>()
  */
 const CACHE_LIMIT = 256
 
-const keyOf = new WeakMap<readonly MutationDef[], string>()
+const keyOf = new WeakMap<readonly SharkPart[], string>()
 
 /**
  * 組み合わせのキャッシュキー。変異 id を定義順に連結する。
@@ -499,24 +499,57 @@ const keyOf = new WeakMap<readonly MutationDef[], string>()
  * mask はランごとにビットの割り当てが変わり、ランをまたぐと別のサメを指すので使えない。
  * 同じ配列が毎フレーム渡される（突撃ビュワー）ため、配列ごとに覚えておく。
  */
-export function spriteKey(defs: readonly MutationDef[]): string {
+export function spriteKey(defs: readonly SharkPart[]): string {
   const hit = keyOf.get(defs)
   if (hit !== undefined) return hit
-  const key = MUTATIONS.filter((m) => defs.includes(m))
-    .map((m) => m.id)
-    .join('+')
+  const ids = MUTATIONS.filter((m) => defs.includes(m)).map((m) => m.id as string)
+  for (const d of defs) if (isDerived(d)) ids.push(`derived:${d.id}`)
+  const key = ids.join('+')
   keyOf.set(defs, key)
   return key
+}
+
+const PLAIN: readonly MutationDef[] = []
+
+/**
+ * 派生種の仮の見た目。専用の絵を描くまで、素のサメに工事中の縞を重ねる。
+ * 派生種を含む個体はほかの変異の見た目を載せず、すべてこの絵にする。
+ */
+function placeholderSprite(scale: number): HTMLCanvasElement {
+  const base = sharkSprite(PLAIN, scale)
+  const { c, g } = newCanvas(base.width, base.height)
+  g.drawImage(base, 0, 0)
+  // 縞はサメの不透明な部分にだけ乗せる
+  g.globalCompositeOperation = 'source-atop'
+  g.globalAlpha = 0.6
+  const stripe = 6 * scale
+  for (let x = -c.height; x < c.width + c.height; x += stripe * 2) {
+    g.fillStyle = '#f2c230'
+    g.beginPath()
+    g.moveTo(x, c.height)
+    g.lineTo(x + stripe, c.height)
+    g.lineTo(x + stripe + c.height, 0)
+    g.lineTo(x + c.height, 0)
+    g.closePath()
+    g.fill()
+  }
+  return c
 }
 
 /**
  * 変異の組み合わせからスプライトを作る。結果は組み合わせ単位でキャッシュする。
  * scale は論理ピクセル 1 つを何 px で描くか。
  */
-export function sharkSprite(mutations: readonly MutationDef[], scale = 1): HTMLCanvasElement {
+export function sharkSprite(mutations: readonly SharkPart[], scale = 1): HTMLCanvasElement {
   const key = `${spriteKey(mutations)}@${scale}`
   const hit = cache.get(key)
   if (hit) return hit
+
+  if (mutations.some(isDerived)) {
+    const out = placeholderSprite(scale)
+    remember(key, out)
+    return out
+  }
 
   // 部位の取り合いや塗り分けの順が渡し方に左右されないよう、定義順にそろえる
   const defs: MutationDef[] = MUTATIONS.filter((m) => mutations.includes(m))
@@ -592,17 +625,21 @@ export function sharkSprite(mutations: readonly MutationDef[], scale = 1): HTMLC
   }
   g.globalAlpha = 1
 
+  remember(key, out)
+  return out
+}
+
+function remember(key: string, out: HTMLCanvasElement): void {
   // 一番古い 1 枚を捨てる。Map は挿入順を保つのでこれで足りる
   if (cache.size >= CACHE_LIMIT) {
     const oldest = cache.keys().next().value
     if (oldest !== undefined) cache.delete(oldest)
   }
   cache.set(key, out)
-  return out
 }
 
 /** 在庫やリザルトなど、DOM に画像として置きたい場所向け */
-export function sharkDataUrl(mutations: readonly MutationDef[], scale = 2): string {
+export function sharkDataUrl(mutations: readonly SharkPart[], scale = 2): string {
   return sharkSprite(mutations, scale).toDataURL()
 }
 
@@ -616,7 +653,7 @@ onAssetLoaded(() => {
 const boundsCache = new Map<string, { x: number; y: number; w: number; h: number }>()
 
 export function sharkBounds(
-  mutations: readonly MutationDef[],
+  mutations: readonly SharkPart[],
   scale = 1,
 ): { x: number; y: number; w: number; h: number } {
   const key = `${spriteKey(mutations)}@${scale}`

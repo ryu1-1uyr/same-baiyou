@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { sortedByPower, totalSharks } from '../../game/inventory.ts'
-import { cachedPower, type MutationDef, mutationsOfMask } from '../../game/mutations.ts'
+import { cachedPower, partsOfMask, type SharkPart } from '../../game/mutations.ts'
 import { pixelIcon } from '../../render/icons.ts'
 import { sharkSprite } from '../../render/sharkSprite.ts'
 import { getConfig, getSpeed, getState } from '../../store/gameStore.ts'
@@ -130,7 +130,7 @@ function pickMask(palette: Shark[], tier: number, tierCount: number): Shark {
 }
 
 /** 流すサメ 1 体の見た目。ランをまたいでも崩れないよう、mask ではなく変異の並びで持つ */
-type Shark = readonly MutationDef[]
+type Shark = readonly SharkPart[]
 const PLAIN: Shark = []
 
 type P = {
@@ -209,7 +209,7 @@ function launchingPalette(): Shark[] {
       acc += weights[i]
       i++
     }
-    out.push(mutationsOfMask(s.slots, rows[i].mask))
+    out.push(partsOfMask(s.slots, rows[i].mask))
   }
   return out
 }

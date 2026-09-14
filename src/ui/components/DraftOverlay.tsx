@@ -2,7 +2,8 @@ import { powerAt, rateAt } from '../../game/mutations.ts'
 import { mutationName } from '../../game/mutations.ts'
 import { policyName } from '../../game/policies.ts'
 import { playSe } from '../../audio/se.ts'
-import { chooseDraft, getConfig, reroll } from '../../store/gameStore.ts'
+import { derivedName, materialsOf } from '../../game/derived.ts'
+import { chooseDerived, chooseDraft, getConfig, reroll } from '../../store/gameStore.ts'
 import { fmt } from '../format.ts'
 import { fill, t } from '../../text/index.ts'
 import { useGame } from '../useGame.ts'
@@ -53,6 +54,30 @@ export function DraftOverlay() {
         )}
 
         <div className="cards">
+          {/* 派生種は条件を満たした報酬なので、変異より先（左）に並べる */}
+          {d.kind === 'mutation' &&
+            d.derived.map((def, i) => {
+              const [a, b] = materialsOf(def)
+              return (
+                <button
+                  key={def.id}
+                  className="card"
+                  data-kind="derived"
+                  onClick={() => {
+                    playSe('choose')
+                    chooseDerived(i)
+                  }}
+                >
+                  <SharkIcon mutations={[def]} height={40} />
+                  <span className="card-rarity">{t.draft.derivedLabel}</span>
+                  <span className="card-name">{derivedName(def)}</span>
+                  <span className="card-effect">
+                    {fill(t.draft.derivedRecipe, { a: mutationName(a), b: mutationName(b) })}
+                  </span>
+                  <span className="card-upgrade">{fill(t.draft.derivedEffect, { bonus: def.bonus })}</span>
+                </button>
+              )
+            })}
           {d.kind === 'mutation'
             ? d.offers.map((m, i) => {
                 const cur = s.ranks.get(m.id) ?? 0

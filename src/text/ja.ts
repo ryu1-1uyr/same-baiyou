@@ -57,6 +57,11 @@ export const ja = {
     unknown: '？？？',
     claim: '研究予算 +{n}',
     claimed: '受け取り済み',
+    derivedTitle: '派生種',
+    recipe: '{a} × {b}',
+    material: '{name} R{rank}',
+    tier: '派生研究 {tier}',
+    locked: '研究所で解禁',
   },
 
   audio: {
@@ -520,6 +525,40 @@ export const ja = {
     feederSynergy: { name: '給餌連動', detail: '給餌装置 1 個につき培養液の生産 +3%' },
     breederSynergy: { name: '過密飼育', detail: '繁殖槽 1 個につき検体の生産速度 +2%' },
     launcherSynergy: { name: '射出斉射', detail: '射出管 1 個につき投入速度 +3%' },
+    derived_1: {
+      name: '派生研究 I',
+      detail: '生体系の変異を掛け合わせた派生種を作れるようになる',
+    },
+    derived_2: {
+      name: '派生研究 II',
+      detail: '系統をまたいで変異を掛け合わせた派生種を作れるようになる',
+    },
+    derived_3: {
+      name: '派生研究 III',
+      detail: 'レジェンダリーを含む派生種を作れるようになる',
+    },
+  },
+
+  /*
+   * 派生種。材料の変異 2 種を R3 まで重ねると作れる。
+   * 他の変異と組み合わさったときは、残りの接頭辞のあとに名前をそのまま付ける（発光シャークトルネード）。
+   */
+  derived: {
+    missile: { name: 'ミサイルシャーク' },
+    urchin: { name: '毒ウニシャーク' },
+    fiveHead: { name: 'ファイブヘッドシャーク' },
+    matango: { name: 'マタンゴシャーク' },
+    phantom: { name: 'ファントムシャーク' },
+    sharkTornado: { name: 'シャークトルネード' },
+    lantern: { name: 'ランタンシャーク' },
+    railgun: { name: 'レールガンシャーク' },
+    heatShock: { name: 'ヒートショックシャーク' },
+    soaring: { name: '飛翔鮫' },
+    megalodon: { name: 'メガロドン' },
+    fortress: { name: '機動要塞機甲鮫' },
+    invader: { name: 'インベーダーシャーク' },
+    megaquake: { name: 'メガクエイクシャーク' },
+    starSpawn: { name: '星辰邪神鮫' },
   },
 
   branch: {
@@ -545,6 +584,8 @@ export const ja = {
     reserve: '予備電源が作動  +{sec} 秒',
     lastStand: '緊急浮上 — 残存する検体をすべて投入',
     traced: '逆探知が完了。軌道より照射を確認',
+    derived: '派生種 {name} を確認',
+    hint: '図鑑に手がかり — {material} R{rank} × ？？？',
   },
 
   draft: {
@@ -556,6 +597,9 @@ export const ja = {
     effect: '発現率 {rate}% ／ 戦闘力 ×{power}',
     unknown: '未解析',
     upgrade: 'R{from} → R{to} に強化',
+    derivedLabel: 'DERIVED',
+    derivedRecipe: '{a} × {b}',
+    derivedEffect: '両方を持つ個体の戦闘力 ×{bonus}',
   },
 
   stock: {

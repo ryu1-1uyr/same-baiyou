@@ -1,6 +1,13 @@
 import type { Config } from './config.ts'
 import { BUILDINGS, BUILDING_INDEX } from './buildings.ts'
-import { DERIVED, type DerivedDef, derivedName, derivedOfferWeight, recipeReady } from './derived.ts'
+import {
+  DERIVED,
+  type DerivedDef,
+  derivedName,
+  derivedOfferWeight,
+  RECIPE_OF,
+  recipeReady,
+} from './derived.ts'
 import { addSharks, launchWeakest, totalSharks } from './inventory.ts'
 import {
   assignSlot,
@@ -143,6 +150,27 @@ export function launchRate(s: GameState, cfg: Config): number {
 }
 
 /**
+ * ドラフトでの変異の重み。プールは最大ランク未満だけに絞ってあるので、ここではランクの上限を見なくてよい。
+ *  - 持っているレア以上は cfg.mutation.reofferMult 倍
+ *  - 解禁済みで未取得の派生種レシピの材料は、材料の片方でも持っていれば cfg.mutation.recipeMaterialMult 倍
+ *    （材料は複数のレシピで使い回さないので、掛かるのは多くても 1 回）
+ */
+function draftWeight(s: GameState, cfg: Config, m: MutationDef): number {
+  let w = offerWeight(m, s.producedTotal)
+  const recipe = RECIPE_OF.get(m.id)
+  if (
+    recipe &&
+    recipe.tier <= s.meta.derivedTier &&
+    !s.slots.fused.includes(recipe) &&
+    recipe.materials.some((id) => (s.ranks.get(id) ?? 0) > 0)
+  ) {
+    w *= cfg.mutation.recipeMaterialMult
+  }
+  const owned = (s.ranks.get(m.id) ?? 0) > 0
+  return owned && (m.rarity === 'rare' || m.rarity === 'legendary') ? w * cfg.mutation.reofferMult : w
+}
+
+/**
  * ドラフトで提示する候補を選ぶ。
  * 重みは累計生産数に依存し、生産が伸びるほどレアな変異が出やすくなる。
  * 取得済みの変異も最大ランク未満なら再提示される。
@@ -178,7 +206,7 @@ function rollOffers(
     const avail = pool.filter((m) => !picked.has(m.id))
     const availDerived = lottery.filter((d) => !derived.includes(d))
     let total = 0
-    for (const m of avail) total += offerWeight(m, s.producedTotal)
+    for (const m of avail) total += draftWeight(s, cfg, m)
     for (const d of availDerived) total += derivedOfferWeight(d, s.producedTotal)
     if (total <= 0) {
       // どの変異も重みを持たないほど生産が少ない場合はコモンから引く
@@ -194,7 +222,7 @@ function rollOffers(
     let r = rng(s) * total
     let hit = false
     for (const m of avail) {
-      r -= offerWeight(m, s.producedTotal)
+      r -= draftWeight(s, cfg, m)
       if (r <= 0) {
         picked.add(m.id)
         offers.push(m)

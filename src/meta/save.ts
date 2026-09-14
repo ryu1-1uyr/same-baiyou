@@ -16,6 +16,9 @@ export function loadMeta(): MetaState {
       bestDepth: Number(parsed.bestDepth) || 0,
       levels: typeof parsed.levels === 'object' && parsed.levels ? { ...parsed.levels } : base.levels,
       unlocked: Array.isArray(parsed.unlocked) ? [...parsed.unlocked] : base.unlocked,
+      // 図鑑より前のセーブには無いので、空から始める
+      discovered: Array.isArray(parsed.discovered) ? [...parsed.discovered] : base.discovered,
+      claimed: Array.isArray(parsed.claimed) ? [...parsed.claimed] : base.claimed,
     }
   } catch {
     // プライベートウィンドウなどで localStorage が使えない場合は初期状態で続行する

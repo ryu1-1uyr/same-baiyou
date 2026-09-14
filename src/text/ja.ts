@@ -48,6 +48,17 @@ export const ja = {
     optionsTitle: 'オプション',
   },
 
+  codex: {
+    title: '図鑑',
+    open: '図鑑を開く',
+    unclaimed: '受け取っていない研究予算が {n} 件あります',
+    progress: '発見 {n} / {total}',
+    sub: 'ドラフトで初めて取った変異がここに載る。載せた原種ごとに 1 回だけ研究予算を受け取れる。',
+    unknown: '？？？',
+    claim: '研究予算 +{n}',
+    claimed: '受け取り済み',
+  },
+
   audio: {
     title: '音量',
     open: '音量設定を開く',

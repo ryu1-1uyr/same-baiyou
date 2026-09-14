@@ -1818,12 +1818,12 @@
   color: var(--c-culture);
   border-color: color-mix(in srgb, var(--c-culture) 55%, var(--c-line));
 }
-.title-dialog {
+.dialog {
   max-width: 520px;
   max-height: calc(100dvh - 2 * var(--sp-5));
   overflow-y: auto;
 }
-.title-dialog .btn {
+.dialog .btn {
   align-self: center;
 }
 .help-steps {
@@ -1857,4 +1857,139 @@
 }
 .title-options .audio-mute {
   align-self: flex-start;
+}
+
+/* ---- 図鑑 ---- */
+/* 受け取っていない研究予算の件数。押す場所から目を離していても気づけるように、戦果の色で出す */
+.badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5em;
+  height: 1.5em;
+  margin-left: var(--sp-2);
+  padding: 0 var(--sp-1);
+  border-radius: 999px;
+  background: var(--c-score);
+  color: var(--c-bg-deep);
+  font-family: var(--font-num);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  vertical-align: middle;
+}
+.hud-codex {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  background: transparent;
+  color: var(--c-text-dim);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-1);
+  padding: 2px var(--sp-3);
+  cursor: pointer;
+}
+.hud-codex:hover {
+  color: var(--c-text);
+  border-color: var(--c-line-hi);
+}
+.dialog.codex {
+  max-width: 760px;
+}
+.codex-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+}
+.codex-progress {
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--c-culture);
+}
+.codex-family {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.codex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--sp-2);
+}
+.codex-entry {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'icon name'
+    'icon rarity'
+    'reward reward';
+  align-items: center;
+  column-gap: var(--sp-2);
+  row-gap: 2px;
+  padding: var(--sp-2);
+  background: var(--c-bg-deep);
+  border: 1px solid var(--c-line);
+  border-left-width: 3px;
+  border-radius: var(--r-1);
+}
+.codex-entry[data-found='false'] {
+  grid-template-areas: 'icon name';
+  border-left-color: var(--c-line);
+}
+/* 未発見は素のサメを影にして、形だけ見せる。黒だと暗い地に沈むので灰色に寄せる */
+.codex-entry[data-found='false'] .shark-icon {
+  filter: brightness(0) invert(0.45);
+  opacity: 0.5;
+}
+.codex-entry[data-found='false'] .codex-name {
+  color: var(--c-text-mute);
+}
+.codex-entry[data-rarity='common'] {
+  border-left-color: var(--c-common);
+}
+.codex-entry[data-rarity='uncommon'] {
+  border-left-color: var(--c-uncommon);
+}
+.codex-entry[data-rarity='rare'] {
+  border-left-color: var(--c-rare);
+}
+.codex-entry[data-rarity='legendary'] {
+  border-left-color: var(--c-legendary);
+}
+.codex-icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  min-width: 48px;
+}
+.codex-name {
+  grid-area: name;
+  font-size: var(--fs-sm);
+}
+.codex-rarity {
+  grid-area: rarity;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  color: var(--c-text-mute);
+}
+.codex-claim,
+.codex-claimed {
+  grid-area: reward;
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+.codex-claim {
+  font-family: var(--font-num);
+  padding: 2px var(--sp-2);
+  background: color-mix(in srgb, var(--c-score) 14%, transparent);
+  color: var(--c-score);
+  border: 1px solid var(--c-score);
+  border-radius: var(--r-1);
+  cursor: pointer;
+}
+.codex-claim:hover {
+  background: color-mix(in srgb, var(--c-score) 26%, transparent);
+}
+.codex-claimed {
+  color: var(--c-text-mute);
 }

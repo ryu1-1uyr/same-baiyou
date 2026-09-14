@@ -1,11 +1,14 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { playSe } from '../../audio/se.ts'
-import { startNewRun } from '../../store/gameStore.ts'
-import { t } from '../../text/index.ts'
+import { unclaimedCount } from '../../game/codex.ts'
+import { getMeta, startNewRun } from '../../store/gameStore.ts'
+import { fill, t } from '../../text/index.ts'
 import { AudioControls } from './AudioPanel.tsx'
+import { CodexModal } from './CodexModal.tsx'
+import { Dialog } from './Dialog.tsx'
 import { SharkIcon } from './SharkIcon.tsx'
 
-type Dialog = 'help' | 'options' | null
+type Open = 'help' | 'options' | 'codex' | null
 
 /**
  * 起動直後の画面。ここにいる間はゲームの時間が進まない。
@@ -14,7 +17,8 @@ type Dialog = 'help' | 'options' | null
  * タイトルで過ごした時間を混ぜないため。
  */
 export function TitleScreen() {
-  const [dialog, setDialog] = useState<Dialog>(null)
+  const [dialog, setDialog] = useState<Open>(null)
+  const unclaimed = unclaimedCount(getMeta())
 
   return (
     <div className="title">
@@ -37,13 +41,21 @@ export function TitleScreen() {
         <button className="title-item" onClick={() => setDialog('help')}>
           {t.title.help}
         </button>
+        <button className="title-item" onClick={() => setDialog('codex')}>
+          {t.codex.title}
+          {unclaimed > 0 && (
+            <span className="badge" title={fill(t.codex.unclaimed, { n: unclaimed })}>
+              {unclaimed}
+            </span>
+          )}
+        </button>
         <button className="title-item" onClick={() => setDialog('options')}>
           {t.title.options}
         </button>
       </nav>
 
       {dialog === 'help' && (
-        <TitleDialog title={t.title.helpTitle} onClose={() => setDialog(null)}>
+        <Dialog title={t.title.helpTitle} onClose={() => setDialog(null)}>
           <ol className="help-steps">
             {t.title.helpSteps.map((step) => (
               <li key={step.head} className="help-step">
@@ -52,53 +64,19 @@ export function TitleScreen() {
               </li>
             ))}
           </ol>
-        </TitleDialog>
+        </Dialog>
       )}
 
+      {dialog === 'codex' && <CodexModal onClose={() => setDialog(null)} />}
+
       {dialog === 'options' && (
-        <TitleDialog title={t.title.optionsTitle} onClose={() => setDialog(null)}>
+        <Dialog title={t.title.optionsTitle} onClose={() => setDialog(null)}>
           <div className="title-options">
             <div className="panel-title">{t.audio.title}</div>
             <AudioControls />
           </div>
-        </TitleDialog>
+        </Dialog>
       )}
-    </div>
-  )
-}
-
-function TitleDialog({
-  title,
-  onClose,
-  children,
-}: {
-  title: string
-  onClose: () => void
-  children: ReactNode
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    // 背景を押しても閉じる。中身のクリックは伝播させない
-    <div className="overlay" onClick={onClose}>
-      <div
-        className="modal title-dialog"
-        role="dialog"
-        aria-label={title}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-title">{title}</div>
-        {children}
-        <button className="btn" onClick={onClose}>
-          {t.title.close}
-        </button>
-      </div>
     </div>
   )
 }

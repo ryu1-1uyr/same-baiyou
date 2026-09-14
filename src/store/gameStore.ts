@@ -1,4 +1,5 @@
 import { BUILDINGS, type BuildingDef, costOf } from '../game/buildings.ts'
+import { claimReward, discover } from '../game/codex.ts'
 import { type Config, DEFAULT_CONFIG } from '../game/config.ts'
 import {
   applyMetaToConfig,
@@ -11,6 +12,7 @@ import {
   NUMERIC_UPGRADES,
   UNLOCKS,
 } from '../game/meta.ts'
+import type { MutationId } from '../game/mutations.ts'
 import { createState, type GameState } from '../game/state.ts'
 import { applyDraft, clickValue, critChance, critMult, rerollDraft, tick } from '../game/tick.ts'
 import { loadMeta, resetMeta, saveMeta } from '../meta/save.ts'
@@ -32,6 +34,8 @@ let speed: Speed = 1
 let version = 0
 let running = false
 let screen: Screen = 'title'
+/** 図鑑を開いている間はランを止める。眺めている間に持ち時間が減らないようにする */
+let codexOpen = false
 /** 直近のランで得た研究予算。リザルト表示に使う */
 let lastAward = 0
 /**
@@ -94,6 +98,23 @@ export function getScreen(): Screen {
 export function setScreen(v: Screen): void {
   screen = v
   emit()
+}
+
+export function isCodexOpen(): boolean {
+  return codexOpen
+}
+
+export function setCodexOpen(v: boolean): void {
+  codexOpen = v
+  emit()
+}
+
+/** 図鑑で原種の研究予算を受け取る */
+export function claimCodexReward(id: MutationId): void {
+  if (claimReward(meta, id) > 0) {
+    saveMeta(meta)
+    emit()
+  }
 }
 
 export function getLastAward(): number {
@@ -223,6 +244,10 @@ export function reroll(): void {
 
 export function chooseDraft(index: number): void {
   applyDraft(state, cfg, index)
+  // 初めて取った変異を図鑑に載せる。方針のドラフトでは ranks が変わらないので何も起きない
+  let found = false
+  for (const id of state.ranks.keys()) if (discover(meta, id)) found = true
+  if (found) saveMeta(meta)
   emit()
 }
 
@@ -267,7 +292,7 @@ function frame(now: number): void {
   while (acc >= TICK) {
     acc -= TICK
     // タイトル表示中は培養フェーズの持ち時間を減らさない
-    if (screen === 'title' || state.phase === 'over' || state.pendingDraft) {
+    if (screen === 'title' || codexOpen || state.phase === 'over' || state.pendingDraft) {
       acc = 0
       break
     }

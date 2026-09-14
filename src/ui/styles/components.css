@@ -642,6 +642,21 @@
   margin-left: auto;
   font-size: var(--fs-md);
 }
+/* ボス戦で時間切れになったときの削り残し。あと一歩だったことを伝える */
+.result-boss {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid color-mix(in srgb, var(--c-boss) 45%, var(--c-line));
+  border-radius: var(--r-1);
+  color: var(--c-text-dim);
+}
+.result-boss .num {
+  margin-left: auto;
+  font-size: var(--fs-lg);
+  color: var(--c-boss);
+}
 .btn {
   background: var(--c-panel-hi);
   border: 1px solid var(--c-line-hi);

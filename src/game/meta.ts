@@ -26,10 +26,23 @@ export type MetaState = {
   levels: Record<string, number>
   /** 買い切りで取得済みの ID */
   unlocked: string[]
+  /** 図鑑に載せた原種の ID（codex.ts） */
+  discovered: string[]
+  /** 図鑑で研究予算を受け取り済みの原種の ID */
+  claimed: string[]
 }
 
 export function createMeta(): MetaState {
-  return { budget: 0, lifetimeBudget: 0, runs: 0, bestDepth: 0, levels: {}, unlocked: [] }
+  return {
+    budget: 0,
+    lifetimeBudget: 0,
+    runs: 0,
+    bestDepth: 0,
+    levels: {},
+    unlocked: [],
+    discovered: [],
+    claimed: [],
+  }
 }
 
 // ---------------------------------------------------------------------------

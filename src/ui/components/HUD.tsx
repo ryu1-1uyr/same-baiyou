@@ -10,6 +10,7 @@ import { depthName } from '../../game/targets.ts'
 import { fill, t } from '../../text/index.ts'
 import { mmss } from '../format.ts'
 import { useGame } from '../useGame.ts'
+import { CodexButton } from './CodexButton.tsx'
 
 const SPEEDS: Speed[] = [1, 2, 4]
 
@@ -35,6 +36,8 @@ export function HUD() {
           <span className="hud-depth-name">{inCulture ? t.phase.safe : name.zone}</span>
         </div>
       </div>
+
+      <CodexButton />
 
       <div className="speed" style={{ marginRight: 'auto' }}>
         {SPEEDS.filter((v) => v <= s.meta.maxSpeed).map((v) => (

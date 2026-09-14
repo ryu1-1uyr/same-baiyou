@@ -13,6 +13,7 @@ import {
 } from '../../game/meta.ts'
 import { MUTATION_BY_ID } from '../../game/mutations.ts'
 import { getMeta, purchaseNode, startNewRun } from '../../store/gameStore.ts'
+import { CodexButton } from './CodexButton.tsx'
 import { SharkIcon } from './SharkIcon.tsx'
 import { fmt } from '../format.ts'
 import { fill, t } from '../../text/index.ts'
@@ -90,6 +91,7 @@ export function LabScreen() {
           <span>{fill(t.lab.bestDepth, { n: meta.bestDepth })}</span>
           <span>{fill(t.lab.lifetime, { n: fmt(meta.lifetimeBudget) })}</span>
         </div>
+        <CodexButton />
         <button className="btn" onClick={startNewRun}>
           {t.lab.start}
         </button>

@@ -9,7 +9,7 @@ import { useGame } from '../useGame.ts'
 import { SharkIcon } from './SharkIcon.tsx'
 import { Sprite } from './Sprite.tsx'
 
-const RARITY_LABEL: Record<string, string> = {
+export const RARITY_LABEL: Record<string, string> = {
   common: 'COMMON',
   uncommon: 'UNCOMMON',
   rare: 'RARE',

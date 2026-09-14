@@ -1,16 +1,5 @@
-import {
-  budgetFor,
-  buyNumeric,
-  buyUnlock,
-  createMeta,
-  nodeUnlocked,
-  nodeName,
-  NUMERIC_UPGRADES,
-  UNLOCK_BY_ID,
-  UNLOCKS,
-  unlockAvailable,
-  upgradeCost,
-} from '../game/meta.ts'
+import { budgetFor, createMeta, nodeName, NUMERIC_UPGRADES } from '../game/meta.ts'
+import { spend } from './policy.ts'
 import { simulate } from './run.ts'
 
 function fmt(n: number): string {
@@ -18,47 +7,6 @@ function fmt(n: number): string {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'
   if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k'
   return Math.floor(n).toString()
-}
-
-/** 買えるもののうち最も安いものを買い続ける（素直なプレイヤーの近似） */
-function spend(meta: ReturnType<typeof createMeta>): string[] {
-  const bought: string[] = []
-  for (let guard = 0; guard < 60; guard++) {
-    let bestId: string | null = null
-    let bestCost = Infinity
-    let bestKind: 'num' | 'unlock' = 'num'
-
-    for (const u of NUMERIC_UPGRADES) {
-      const lv = meta.levels[u.id] ?? 0
-      if (lv >= u.maxLevel) continue
-      // 前提を満たしていないものを選ぶと buyNumeric が失敗し、同じ候補を選び続けて空回りする
-      if (!nodeUnlocked(meta, u.id)) continue
-      const c = upgradeCost(u, lv)
-      if (c <= meta.budget && c < bestCost) {
-        bestCost = c
-        bestId = u.id
-        bestKind = 'num'
-      }
-    }
-    for (const u of UNLOCKS) {
-      if (!unlockAvailable(meta, u)) continue
-      if (u.cost <= meta.budget && u.cost < bestCost) {
-        bestCost = u.cost
-        bestId = u.id
-        bestKind = 'unlock'
-      }
-    }
-
-    if (!bestId) break
-    if (bestKind === 'num') {
-      buyNumeric(meta, bestId)
-      bought.push(bestId)
-    } else {
-      buyUnlock(meta, bestId)
-      bought.push(`★${nodeName(bestId)}`)
-    }
-  }
-  return bought
 }
 
 const RUNS = Number(process.argv[2] ?? 40)

@@ -1,4 +1,5 @@
 import { BUILDINGS, buildingName } from '../game/buildings.ts'
+import { DERIVED, type DerivedId, recipeReady } from '../game/derived.ts'
 import { type Config, DEFAULT_CONFIG, withConfig } from '../game/config.ts'
 import { totalSharks } from '../game/inventory.ts'
 import { MUTATION_BY_ID, type MutationId, expectedPower, nameOfMask, powerOfMask } from '../game/mutations.ts'
@@ -32,6 +33,10 @@ export type SimResult = {
   rankIds: MutationId[]
   ranks: string
   topStacks: Array<{ name: string; count: number; power: number }>
+  /** 取った派生種 */
+  derived: DerivedId[]
+  /** ラン終了時点で材料が条件のランクに届いていたレシピ（取ったかどうかは問わない） */
+  readyRecipes: DerivedId[]
 }
 
 /**
@@ -46,8 +51,14 @@ function pickDraft(s: GameState, cfg: Config, chooser: ReturnType<typeof makeDra
 /**
  * 派生種のカードを取るか。取るならその添字、取らないなら -1。
  * 取った後の期待戦闘力が、変異の側で選ぶ 1 枚を取った場合以上なら取る。
+ * always が立っていれば比べずに取る（レシピを狙う方針）。
  */
-function pickDerived(s: GameState, cfg: Config, chooser: ReturnType<typeof makeDraftChooser>): number {
+function pickDerived(
+  s: GameState,
+  cfg: Config,
+  chooser: ReturnType<typeof makeDraftChooser>,
+  always: boolean,
+): number {
   const d = s.pendingDraft!
   if (d.kind !== 'mutation' || d.derived.length === 0) return -1
   let best = -1
@@ -59,7 +70,7 @@ function pickDerived(s: GameState, cfg: Config, chooser: ReturnType<typeof makeD
       best = i
     }
   })
-  if (d.offers.length === 0) return best
+  if (d.offers.length === 0 || always) return best
   const pick = d.offers[chooser(d.offers, s, cfg)]
   const trial = new Map(s.ranks)
   trial.set(pick.id, (trial.get(pick.id) ?? 0) + 1)
@@ -80,7 +91,7 @@ export function simulate(opts: SimOptions = {}): SimResult {
   while (s.phase !== 'over' && s.t < maxT) {
     tick(s, input, cfg)
     if (s.pendingDraft) {
-      const derived = pickDerived(s, cfg, chooser)
+      const derived = pickDerived(s, cfg, chooser, opts.draft === 'chaseRecipe')
       if (derived >= 0) applyDerived(s, cfg, derived)
       else applyDraft(s, cfg, pickDraft(s, cfg, chooser))
     }
@@ -110,6 +121,8 @@ export function simulate(opts: SimOptions = {}): SimResult {
     rankIds: [...s.ranks.keys()],
     ranks: [...s.ranks.entries()].map(([id, r]) => `${mutationName(MUTATION_BY_ID.get(id)!)}R${r}`).join(' '),
     topStacks: stacks,
+    derived: s.slots.fused.map((d) => d.id),
+    readyRecipes: DERIVED.filter((d) => recipeReady(d, s.ranks)).map((d) => d.id),
   }
 }
 

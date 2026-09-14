@@ -1,6 +1,18 @@
 import { BUILDINGS, costOf } from '../game/buildings.ts'
 import type { Config } from '../game/config.ts'
-import { expectedPower, type MutationDef } from '../game/mutations.ts'
+import {
+  buyNumeric,
+  buyUnlock,
+  type MetaState,
+  nodeName,
+  nodeUnlocked,
+  NUMERIC_UPGRADES,
+  UNLOCKS,
+  unlockAvailable,
+  upgradeCost,
+} from '../game/meta.ts'
+import { DERIVED, type DerivedDef, RECIPE_RANK } from '../game/derived.ts'
+import { expectedPower, MUTATION_BY_ID, type MutationDef } from '../game/mutations.ts'
 import type { GameState } from '../game/state.ts'
 
 /** 施設をどの比率で揃えるか。各要素は BUILDINGS と同順の目標比 */
@@ -61,7 +73,7 @@ export function autoBuy(s: GameState, cfg: Config, ratio: BuyRatio, income: numb
   }
 }
 
-export type DraftPolicyName = 'stack' | 'spread' | 'greedyEV' | 'random' | 'rarity'
+export type DraftPolicyName = 'stack' | 'spread' | 'greedyEV' | 'random' | 'rarity' | 'chaseRecipe'
 
 /**
  * ドラフト方針。
@@ -70,6 +82,8 @@ export type DraftPolicyName = 'stack' | 'spread' | 'greedyEV' | 'random' | 'rari
  *  greedyEV … 取った後の期待戦闘力が最大になる 1 枚を選ぶ（上手いプレイヤーの近似）
  *  rarity   … 最もレアな 1 枚を選ぶ。倍率が伏せられている状態のプレイヤーの近似
  *  random   … 無作為
+ *  chaseRecipe … 派生種のレシピを狙う。材料を R3 まで重ね、派生カードは必ず取る。
+ *                材料が出なければ greedyEV
  */
 export function makeDraftChooser(name: DraftPolicyName) {
   return (offers: MutationDef[], s: GameState, cfg: Config): number => {
@@ -107,6 +121,17 @@ export function makeDraftChooser(name: DraftPolicyName) {
       return best
     }
 
+    if (name === 'chaseRecipe') {
+      const target = recipeTarget(s)
+      if (target) {
+        // 完成に近いレシピの材料を優先し、無ければ他の解禁済みレシピの材料を拾う
+        const primary = offers.findIndex((o) => needsRank(s, target, o))
+        if (primary >= 0) return primary
+        const secondary = offers.findIndex((o) => openRecipes(s).some((d) => needsRank(s, d, o)))
+        if (secondary >= 0) return secondary
+      }
+    }
+
     // greedyEV
     let best = 0
     let bestEv = -Infinity
@@ -121,6 +146,35 @@ export function makeDraftChooser(name: DraftPolicyName) {
     })
     return best
   }
+}
+
+/** 解禁済みで、まだ取っていない派生種のレシピ */
+function openRecipes(s: GameState): DerivedDef[] {
+  return DERIVED.filter(
+    (d) =>
+      d.tier <= s.meta.derivedTier &&
+      !s.slots.fused.includes(d) &&
+      d.materials.every((id) => s.meta.families.has(MUTATION_BY_ID.get(id)!.family)),
+  )
+}
+
+/** そのカードが、レシピの材料をまだ条件のランクまで重ねていないものか */
+function needsRank(s: GameState, d: DerivedDef, o: MutationDef): boolean {
+  return d.materials.includes(o.id) && (s.ranks.get(o.id) ?? 0) < RECIPE_RANK
+}
+
+/** 狙うレシピ。材料のランクの合計が最も高い（完成に近い）もの */
+function recipeTarget(s: GameState): DerivedDef | null {
+  let best: DerivedDef | null = null
+  let bestProgress = -1
+  for (const d of openRecipes(s)) {
+    const progress = d.materials.reduce((a, id) => a + Math.min(RECIPE_RANK, s.ranks.get(id) ?? 0), 0)
+    if (progress > bestProgress) {
+      bestProgress = progress
+      best = d
+    }
+  }
+  return best
 }
 
 /**
@@ -153,4 +207,45 @@ export function pickPolicy(offers: Array<{ id: string }>): number {
     }
   })
   return best
+}
+
+/** 買えるもののうち最も安いものを買い続ける（素直なプレイヤーの近似） */
+export function spend(meta: MetaState): string[] {
+  const bought: string[] = []
+  for (let guard = 0; guard < 60; guard++) {
+    let bestId: string | null = null
+    let bestCost = Infinity
+    let bestKind: 'num' | 'unlock' = 'num'
+
+    for (const u of NUMERIC_UPGRADES) {
+      const lv = meta.levels[u.id] ?? 0
+      if (lv >= u.maxLevel) continue
+      // 前提を満たしていないものを選ぶと buyNumeric が失敗し、同じ候補を選び続けて空回りする
+      if (!nodeUnlocked(meta, u.id)) continue
+      const c = upgradeCost(u, lv)
+      if (c <= meta.budget && c < bestCost) {
+        bestCost = c
+        bestId = u.id
+        bestKind = 'num'
+      }
+    }
+    for (const u of UNLOCKS) {
+      if (!unlockAvailable(meta, u)) continue
+      if (u.cost <= meta.budget && u.cost < bestCost) {
+        bestCost = u.cost
+        bestId = u.id
+        bestKind = 'unlock'
+      }
+    }
+
+    if (!bestId) break
+    if (bestKind === 'num') {
+      buyNumeric(meta, bestId)
+      bought.push(bestId)
+    } else {
+      buyUnlock(meta, bestId)
+      bought.push(`★${nodeName(bestId)}`)
+    }
+  }
+  return bought
 }

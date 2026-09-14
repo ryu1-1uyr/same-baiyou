@@ -65,6 +65,11 @@ export const DERIVED: DerivedDef[] = [
 
 export const DERIVED_BY_ID = new Map(DERIVED.map((d) => [d.id, d]))
 
+/** 材料 → その材料を使うレシピ。材料は使い回さないので 1 対 1 */
+export const RECIPE_OF = new Map<MutationId, DerivedDef>(
+  DERIVED.flatMap((d) => d.materials.map((id) => [id, d] as const)),
+)
+
 {
   const used = new Set<MutationId>()
   for (const d of DERIVED) {

@@ -1,6 +1,7 @@
 import { maskOf, powerAt, rateAt } from '../../game/mutations.ts'
 import { mutationName } from '../../game/mutations.ts'
 import { policyName } from '../../game/policies.ts'
+import { playSe } from '../../audio/se.ts'
 import { chooseDraft, getConfig, reroll } from '../../store/gameStore.ts'
 import { fmt } from '../format.ts'
 import { fill, t } from '../../text/index.ts'
@@ -40,7 +41,13 @@ export function DraftOverlay() {
         </div>
 
         {s.rerollsLeft > 0 && (
-          <button className="reroll" onClick={reroll}>
+          <button
+            className="reroll"
+            onClick={() => {
+              playSe('buy')
+              reroll()
+            }}
+          >
             {fill(t.draft.reroll, { n: s.rerollsLeft })}
           </button>
         )}
@@ -51,7 +58,15 @@ export function DraftOverlay() {
                 const cur = s.ranks.get(m.id) ?? 0
                 const next = cur + 1
                 return (
-                  <button key={m.id} className="card" data-rarity={m.rarity} onClick={() => chooseDraft(i)}>
+                  <button
+                    key={m.id}
+                    className="card"
+                    data-rarity={m.rarity}
+                    onClick={() => {
+                      playSe('choose')
+                      chooseDraft(i)
+                    }}
+                  >
                     <SharkIcon mask={maskOf(m)} height={40} />
                     <span className="card-rarity">{RARITY_LABEL[m.rarity]}</span>
                     <span className="card-name">{mutationName(m)}</span>
@@ -75,7 +90,15 @@ export function DraftOverlay() {
                 const cur = s.policies.get(p.id) ?? 0
                 const next = cur + 1
                 return (
-                  <button key={p.id} className="card" data-kind="policy" onClick={() => chooseDraft(i)}>
+                  <button
+                    key={p.id}
+                    className="card"
+                    data-kind="policy"
+                    onClick={() => {
+                      playSe('choose')
+                      chooseDraft(i)
+                    }}
+                  >
                     <Sprite kind="policy" id={p.id} size={40} />
                     <span className="card-rarity">POLICY</span>
                     <span className="card-name">{policyName(p)}</span>

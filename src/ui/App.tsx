@@ -4,6 +4,8 @@ import { t } from '../text/index.ts'
 import { LabScreen } from './components/LabScreen.tsx'
 import { useAtmosphere } from './useAtmosphere.ts'
 import { useGame } from './useGame.ts'
+import { useSound } from './useSound.ts'
+import { AudioPanel } from './components/AudioPanel.tsx'
 import { DebugPanel } from './components/DebugPanel.tsx'
 import { DepthFlash } from './components/DepthFlash.tsx'
 import { DraftOverlay } from './components/DraftOverlay.tsx'
@@ -16,6 +18,7 @@ import { StockPanel } from './components/StockPanel.tsx'
 export function App() {
   useGame()
   useAtmosphere()
+  useSound()
   useEffect(() => {
     startLoop()
   }, [])
@@ -25,6 +28,7 @@ export function App() {
       <>
         <LabScreen />
         <DebugPanel />
+        <AudioPanel />
         <Copyright />
       </>
     )
@@ -41,6 +45,7 @@ export function App() {
       <ResultOverlay />
       <DepthFlash />
       <DebugPanel />
+      <AudioPanel />
       <Copyright />
     </div>
   )

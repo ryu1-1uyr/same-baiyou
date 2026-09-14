@@ -17,6 +17,17 @@ export const ja = {
     copyright: '© 2026 created by ryu',
   },
 
+  audio: {
+    title: '音量',
+    open: '音量設定を開く',
+    close: '音量設定を閉じる',
+    master: '全体',
+    se: '効果音',
+    bgm: 'BGM',
+    mute: 'ミュート',
+    unmute: 'ミュート解除',
+  },
+
   phase: {
     culture: 'サメ培養フェーズ',
     invasion: 'サメ侵略フェーズ',

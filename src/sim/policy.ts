@@ -113,7 +113,7 @@ export function makeDraftChooser(name: DraftPolicyName) {
     offers.forEach((o, i) => {
       const trial = new Map(s.ranks)
       trial.set(o.id, (trial.get(o.id) ?? 0) + 1)
-      const ev = expectedPower(trial, cfg)
+      const ev = expectedPower(trial, cfg, 1, s.slots.fused)
       if (ev > bestEv) {
         bestEv = ev
         best = i

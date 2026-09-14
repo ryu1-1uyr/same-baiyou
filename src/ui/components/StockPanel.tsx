@@ -2,7 +2,7 @@ import {
   cachedPower,
   MUTATIONS,
   mutationName,
-  mutationsOfMask,
+  partsOfMask,
   nameOfMask,
   rateAt,
 } from '../../game/mutations.ts'
@@ -97,7 +97,7 @@ export function StockPanel() {
         ) : (
           shown.map((st) => (
             <div key={st.mask} className="stack" data-empty={st.count < 1}>
-              <SharkIcon mutations={mutationsOfMask(s.slots, st.mask)} height={26} />
+              <SharkIcon mutations={partsOfMask(s.slots, st.mask)} height={26} />
               <span className="stack-name">{nameOfMask(s.slots, st.mask)}</span>
               <span className="stack-count">{fmt(st.count)}</span>
               <span className="stack-power">{fmt(st.power)}</span>

@@ -1,6 +1,7 @@
 import type { Config } from './config.ts'
 import { BUILDINGS, BUILDING_INDEX } from './buildings.ts'
 import { type MetaEffects, metaEffects, createMeta } from './meta.ts'
+import type { DerivedDef, DerivedId } from './derived.ts'
 import type { Inventory } from './inventory.ts'
 import {
   type MutationDef,
@@ -9,6 +10,7 @@ import {
   type MutationRanks,
   type MutationSlots,
   type PowerCache,
+  type SharkPart,
   birthDistribution,
   createSlots,
 } from './mutations.ts'
@@ -23,17 +25,18 @@ import {
 
 export type Phase = 'culture' | 'invasion' | 'over'
 
+/** 突然変異のドラフトには、条件を満たした派生種のカードが並ぶことがある */
 export type PendingDraft =
-  { kind: 'mutation'; offers: MutationDef[] } | { kind: 'policy'; offers: PolicyDef[] }
+  { kind: 'mutation'; offers: MutationDef[]; derived: DerivedDef[] } | { kind: 'policy'; offers: PolicyDef[] }
 
 export type LogKind = 'hit' | 'boss' | 'depth' | 'draft' | 'policy' | 'system' | 'birth' | 'record'
 /** mutations を持つ行は、その組み合わせのサメを添えて表示する */
-export type LogEntry = { t: number; kind: LogKind; text: string; mutations?: readonly MutationDef[] }
+export type LogEntry = { t: number; kind: LogKind; text: string; mutations?: readonly SharkPart[] }
 
 /** ログの保持件数。表示に使うぶんだけあればよい */
 const LOG_LIMIT = 40
 
-export function pushLog(s: GameState, kind: LogKind, text: string, mutations?: readonly MutationDef[]): void {
+export function pushLog(s: GameState, kind: LogKind, text: string, mutations?: readonly SharkPart[]): void {
   s.log.unshift({ t: s.t, kind, text, mutations })
   if (s.log.length > LOG_LIMIT) s.log.length = LOG_LIMIT
 }
@@ -112,6 +115,8 @@ export type GameState = {
   rerollsLeft: number
   /** 予備電源を使ったか */
   reserveUsed: boolean
+  /** 確定の提示を済ませた派生種。取らなかったものは以降、通常の抽選に混ざる */
+  derivedOffered: Set<DerivedId>
 }
 
 export function createState(cfg: Config, seed: number, meta?: MetaEffects): GameState {
@@ -153,6 +158,7 @@ export function createState(cfg: Config, seed: number, meta?: MetaEffects): Game
     meta: eff,
     rerollsLeft: eff.rerolls,
     reserveUsed: false,
+    derivedOffered: new Set(),
   }
 
   // 恒久強化ぶんの初期値を積む

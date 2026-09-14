@@ -19,6 +19,7 @@ export function loadMeta(): MetaState {
       // 図鑑より前のセーブには無いので、空から始める
       discovered: Array.isArray(parsed.discovered) ? [...parsed.discovered] : base.discovered,
       claimed: Array.isArray(parsed.claimed) ? [...parsed.claimed] : base.claimed,
+      hints: Array.isArray(parsed.hints) ? [...parsed.hints] : base.hints,
     }
   } catch {
     // プライベートウィンドウなどで localStorage が使えない場合は初期状態で続行する

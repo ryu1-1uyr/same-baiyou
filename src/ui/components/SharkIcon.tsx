@@ -1,16 +1,10 @@
 import { useEffect, useRef } from 'react'
-import type { MutationDef } from '../../game/mutations.ts'
+import type { SharkPart } from '../../game/mutations.ts'
 import { sharkBounds, sharkSprite, spriteKey } from '../../render/sharkSprite.ts'
 import { useAssetVersion } from '../useAssetVersion.ts'
 
 /** 合成スプライトを DOM に置くための小さなラッパ */
-export function SharkIcon({
-  mutations,
-  height = 20,
-}: {
-  mutations: readonly MutationDef[]
-  height?: number
-}) {
+export function SharkIcon({ mutations, height = 20 }: { mutations: readonly SharkPart[]; height?: number }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const assetVersion = useAssetVersion()
   // 呼び出し側は描画のたびに配列を作り直すことがあるので、中身で描き直しを判定する

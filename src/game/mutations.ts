@@ -1,4 +1,5 @@
 import type { Config } from './config.ts'
+import type { DerivedDef } from './derived.ts'
 import { t } from '../text/index.ts'
 
 // prettier-ignore
@@ -71,10 +72,14 @@ export type MutationSlots = {
   slotOf: Map<MutationId, number>
   /** mask → 含まれる変異（定義順）。同じ mask には同じ配列を返す */
   defsOf: Map<MutationMask, readonly MutationDef[]>
+  /** このランで取った派生種。材料 2 種を併せ持つ mask は派生種として読む */
+  fused: DerivedDef[]
+  /** mask → 派生種を反映した見た目の部品。派生種を取るたびに作り直す */
+  partsOf: Map<MutationMask, readonly SharkPart[]>
 }
 
 export function createSlots(): MutationSlots {
-  return { bySlot: [], slotOf: new Map(), defsOf: new Map() }
+  return { bySlot: [], slotOf: new Map(), defsOf: new Map(), fused: [], partsOf: new Map() }
 }
 
 /** 変異にビットを割り当てる。割り当て済みなら何もしない */
@@ -103,6 +108,25 @@ export function hasMutation(slots: MutationSlots, mask: MutationMask, def: Mutat
 /** マスクに変異を足す（既に含まれていれば何もしない） */
 function addMutation(slots: MutationSlots, mask: MutationMask, def: MutationDef): MutationMask {
   return hasMutation(slots, mask, def) ? mask : mask + maskOf(slots, def)
+}
+
+/** サメ 1 体を形作る部品。変異か、材料 2 種が合わさった派生種 */
+export type SharkPart = MutationDef | DerivedDef
+
+export function isDerived(part: SharkPart): part is DerivedDef {
+  return 'materials' in part
+}
+
+/** 派生種を取り込む。以降、材料 2 種を併せ持つ mask は派生種として読む */
+export function fuse(slots: MutationSlots, def: DerivedDef): void {
+  if (slots.fused.includes(def)) return
+  slots.fused.push(def)
+  slots.partsOf.clear()
+}
+
+/** mask が派生種の材料を 2 種とも持っているか */
+function hasBoth(slots: MutationSlots, mask: MutationMask, def: DerivedDef): boolean {
+  return def.materials.every((id) => hasMutation(slots, mask, MUTATION_BY_ID.get(id)!))
 }
 
 /**
@@ -219,7 +243,26 @@ export function powerOfMask(
 ): number {
   let p = cfg.shark.basePower * powerMult
   for (const def of mutationsOfMask(slots, mask)) p *= powerAt(def, ranks.get(def.id) ?? 0, cfg)
+  // 派生種は材料の倍率の積にさらにボーナスを掛ける
+  for (const f of slots.fused) if (hasBoth(slots, mask, f)) p *= f.bonus
   return p
+}
+
+/**
+ * mask を見た目の部品に読み替える。派生種の材料 2 種は派生種 1 つにまとめる。
+ * 派生種を含まない mask は mutationsOfMask と同じ配列を返す（スプライトのキャッシュを共有するため）。
+ */
+export function partsOfMask(slots: MutationSlots, mask: MutationMask): readonly SharkPart[] {
+  const hit = slots.partsOf.get(mask)
+  if (hit) return hit
+  const defs = mutationsOfMask(slots, mask)
+  const fused = slots.fused.filter((f) => hasBoth(slots, mask, f))
+  const parts: readonly SharkPart[] =
+    fused.length === 0
+      ? defs
+      : [...defs.filter((d) => !fused.some((f) => f.materials.includes(d.id))), ...fused]
+  slots.partsOf.set(mask, parts)
+  return parts
 }
 
 /**
@@ -288,11 +331,20 @@ export function birthDistribution(
     const next: Array<[MutationMask, number, number]> = []
     for (const [mask, prob, pw] of dist) {
       if (prob * (1 - p) > 0) next.push([mask, prob * (1 - p), pw])
-      if (prob * p > 0) next.push([addMutation(slots, mask, def), prob * p, pw * mult])
+      if (prob * p > 0) {
+        const added = addMutation(slots, mask, def)
+        next.push([added, prob * p, fusedPower(slots, added, def, pw * mult)])
+      }
     }
     dist = next.length > cap ? prune(next) : next
   }
   return normalize(dist)
+}
+
+/** 変異 def を足した結果、派生種の材料が揃ったらボーナスを掛ける（間引きの順位を実際の戦闘力に合わせる） */
+function fusedPower(slots: MutationSlots, mask: MutationMask, def: MutationDef, pw: number): number {
+  for (const f of slots.fused) if (f.materials.includes(def.id) && hasBoth(slots, mask, f)) pw *= f.bonus
+  return pw
 }
 
 /** 出やすい順の上位と、期待ダメージの大きい順の上位を残す */
@@ -329,23 +381,49 @@ function normalize(rows: Array<[MutationMask, number, number]>): Array<[Mutation
   return rows.map((r) => [r[0], common.has(r[0]) ? r[1] * scale : r[1]])
 }
 
-/** サメ 1 体あたりの期待戦闘力  E = Π (1 + p*(m-1)) */
-export function expectedPower(ranks: MutationRanks, cfg: Config, powerMult = 1): number {
+/**
+ * サメ 1 体あたりの期待戦闘力  E = Π (1 + p*(m-1))
+ *
+ * 派生種の材料 2 種は独立に掛けられないので、組ごとに
+ * 「片方だけ・両方」の場合分けで期待値を取る（両方のときだけボーナスが乗る）。
+ */
+export function expectedPower(
+  ranks: MutationRanks,
+  cfg: Config,
+  powerMult = 1,
+  fused: readonly DerivedDef[] = [],
+): number {
   let e = cfg.shark.basePower * powerMult
   for (const def of MUTATIONS) {
     const rank = ranks.get(def.id) ?? 0
     if (rank <= 0) continue
+    if (fused.some((f) => f.materials.includes(def.id))) continue
     e *= 1 + rateAt(def, rank, cfg) * (powerAt(def, rank, cfg) - 1)
+  }
+  for (const f of fused) {
+    const [a, b] = f.materials.map((id) => MUTATION_BY_ID.get(id)!)
+    const ra = ranks.get(a.id) ?? 0
+    const rb = ranks.get(b.id) ?? 0
+    const pa = rateAt(a, ra, cfg)
+    const pb = rateAt(b, rb, cfg)
+    const ma = powerAt(a, ra, cfg)
+    const mb = powerAt(b, rb, cfg)
+    e *= (1 - pa) * (1 - pb) + pa * (1 - pb) * ma + (1 - pa) * pb * mb + pa * pb * f.bonus * ma * mb
   }
   return e
 }
 
-/** 複合サメの名前。渡された変異（定義順）の接頭辞を連結するだけ */
-export function nameOfMutations(defs: readonly MutationDef[]): string {
-  const parts = defs.map((m) => t.mutation[m.id].prefix)
-  return parts.length === 0 ? t.shark.plain : parts.join('') + t.shark.suffix
+/**
+ * 複合サメの名前。渡された変異（定義順）の接頭辞を連結する。
+ * 派生種を含むときは、残りの接頭辞のあとに派生種の名前をそのまま付ける（発光シャークトルネード）。
+ */
+export function nameOfMutations(parts: readonly SharkPart[]): string {
+  const prefixes = parts.filter((p) => !isDerived(p)).map((m) => t.mutation[m.id as MutationId].prefix)
+  const derived = parts.filter(isDerived).map((d) => t.derived[d.id].name)
+  if (derived.length > 0) return prefixes.join('') + derived.join('')
+  return prefixes.length === 0 ? t.shark.plain : prefixes.join('') + t.shark.suffix
 }
 
 export function nameOfMask(slots: MutationSlots, mask: MutationMask): string {
-  return nameOfMutations(mutationsOfMask(slots, mask))
+  return nameOfMutations(partsOfMask(slots, mask))
 }

@@ -30,6 +30,8 @@ export type MetaState = {
   discovered: string[]
   /** 図鑑で研究予算を受け取り済みの原種の ID */
   claimed: string[]
+  /** 図鑑で開いた派生種のヒント（`派生種:材料`） */
+  hints: string[]
 }
 
 export function createMeta(): MetaState {
@@ -42,6 +44,7 @@ export function createMeta(): MetaState {
     unlocked: [],
     discovered: [],
     claimed: [],
+    hints: [],
   }
 }
 
@@ -311,6 +314,10 @@ export const UNLOCKS: UnlockDef[] = [
     kind: 'qol',
     requires: 'autoBuyOne',
   },
+  // 派生種の解禁。系統をすべて解禁した先に置く。コストは試遊前の仮の値
+  { id: 'derived_1', cost: 60000, kind: 'unique', requires: 'family_disaster' },
+  { id: 'derived_2', cost: 200000, kind: 'unique', requires: 'derived_1' },
+  { id: 'derived_3', cost: 800000, kind: 'unique', requires: 'derived_2' },
 ]
 
 export const UNLOCK_BY_ID = new Map<string, UnlockDef>(UNLOCKS.map((u) => [u.id, u]))
@@ -364,6 +371,8 @@ export type MetaEffects = {
   overkillMult: number
   /** ラン終了時に在庫をすべて投入する */
   lastStand: boolean
+  /** 作れる派生種の段。0 なら派生種は出ない */
+  derivedTier: 0 | 1 | 2 | 3
 }
 
 export function metaEffects(m: MetaState): MetaEffects {
@@ -405,6 +414,7 @@ export function metaEffects(m: MetaState): MetaEffects {
     reserveSeconds: has('reservePower') ? 20 : 0,
     overkillMult: has('chainCollapse') ? 2 : 1,
     lastStand: has('lastStand'),
+    derivedTier: has('derived_3') ? 3 : has('derived_2') ? 2 : has('derived_1') ? 1 : 0,
   }
 }
 
@@ -533,6 +543,9 @@ export const TREE: TreeNode[] = [
   { id: 'family_mech', branch: 'fam', col: 5, row: 1, requires: ['family_abyss'], preview: 'mecha' },
   { id: 'family_cosmic', branch: 'fam', col: 5, row: 2, requires: ['family_mech'], preview: 'alien' },
   { id: 'family_disaster', branch: 'fam', col: 5, row: 3, requires: ['family_cosmic'], preview: 'tornado' },
+  { id: 'derived_1', branch: 'fam', col: 5, row: 4, requires: ['family_disaster'] },
+  { id: 'derived_2', branch: 'fam', col: 5, row: 5, requires: ['derived_1'] },
+  { id: 'derived_3', branch: 'fam', col: 5, row: 6, requires: ['derived_2'] },
 
   // 運用 — 周回の速度
   { id: 'speed2', branch: 'ops', col: 6, row: 0, requires: [] },

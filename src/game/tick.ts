@@ -1,14 +1,17 @@
 import type { Config } from './config.ts'
 import { BUILDINGS, BUILDING_INDEX } from './buildings.ts'
+import { DERIVED, type DerivedDef, derivedName, derivedOfferWeight, recipeReady } from './derived.ts'
 import { addSharks, launchWeakest, totalSharks } from './inventory.ts'
 import {
   assignSlot,
+  fuse,
   MUTATIONS,
   type MutationDef,
   type MutationId,
   type MutationMask,
   mutationName,
   mutationsOfMask,
+  partsOfMask,
   nameOfMutations,
   offerWeight,
   powerOfMask,
@@ -60,7 +63,7 @@ function isNotable(s: GameState, mask: MutationMask): boolean {
 
 /** 生まれた個体を、その組み合わせのサメを添えて記録に残す */
 function logBirth(s: GameState, kind: 'birth' | 'record', mask: MutationMask): void {
-  const defs = mutationsOfMask(s.slots, mask)
+  const defs = partsOfMask(s.slots, mask)
   pushLog(
     s,
     kind,
@@ -143,36 +146,72 @@ export function launchRate(s: GameState, cfg: Config): number {
  * ドラフトで提示する候補を選ぶ。
  * 重みは累計生産数に依存し、生産が伸びるほどレアな変異が出やすくなる。
  * 取得済みの変異も最大ランク未満なら再提示される。
+ *
+ * 派生種は、条件を満たして初めてのドラフトで確定で出す（枠を 1 つ使う）。
+ * そこで取らなかったものは、以降は変異と同じ抽選に混ざる。
+ * keep は引き直しでも残す派生カード。
  */
-function rollOffers(s: GameState, cfg: Config): MutationDef[] {
+function rollOffers(
+  s: GameState,
+  cfg: Config,
+  keep: readonly DerivedDef[] = [],
+): { offers: MutationDef[]; derived: DerivedDef[] } {
   const pool = MUTATIONS.filter(
     (m) => s.meta.families.has(m.family) && (s.ranks.get(m.id) ?? 0) < s.meta.maxRank,
   )
+  const derived: DerivedDef[] = [...keep]
+  const ready = DERIVED.filter(
+    (d) => d.tier <= s.meta.derivedTier && !s.slots.fused.includes(d) && recipeReady(d, s.ranks),
+  )
+  for (const d of ready) {
+    if (s.derivedOffered.has(d.id) || derived.includes(d)) continue
+    derived.push(d)
+    s.derivedOffered.add(d.id)
+  }
+  const lottery = ready.filter((d) => !derived.includes(d))
+
   const offers: MutationDef[] = []
   const picked = new Set<MutationId>()
-  const size = Math.min(cfg.mutation.draftSize + s.meta.extraOffers, pool.length)
-  while (offers.length < size) {
+  const drawn = derived.length
+  const size = Math.min(cfg.mutation.draftSize + s.meta.extraOffers - drawn, pool.length + lottery.length)
+  while (offers.length + derived.length - drawn < size) {
     const avail = pool.filter((m) => !picked.has(m.id))
+    const availDerived = lottery.filter((d) => !derived.includes(d))
     let total = 0
     for (const m of avail) total += offerWeight(m, s.producedTotal)
+    for (const d of availDerived) total += derivedOfferWeight(d, s.producedTotal)
     if (total <= 0) {
       // どの変異も重みを持たないほど生産が少ない場合はコモンから引く
+      if (avail.length === 0) {
+        derived.push(availDerived[0])
+        continue
+      }
       const fallback = avail[Math.floor(rng(s) * avail.length)]
       picked.add(fallback.id)
       offers.push(fallback)
       continue
     }
     let r = rng(s) * total
+    let hit = false
     for (const m of avail) {
       r -= offerWeight(m, s.producedTotal)
       if (r <= 0) {
         picked.add(m.id)
         offers.push(m)
+        hit = true
+        break
+      }
+    }
+    if (hit) continue
+    for (const d of availDerived) {
+      r -= derivedOfferWeight(d, s.producedTotal)
+      if (r <= 0) {
+        derived.push(d)
         break
       }
     }
   }
-  return offers
+  return { offers, derived }
 }
 
 /** 研究方針の候補を選ぶ。上限に達していないものから無作為に */
@@ -299,10 +338,10 @@ export function tick(s: GameState, input: TickInput, cfg: Config): void {
   // 提示だけ行い、選択されるまで進行を止める（選択は applyDraft が行う）。
   // 両方が同時に条件を満たしたときは変異を先に出し、方針は次のティックまで待つ。
   if (s.producedTotal >= s.nextDraftAt) {
-    const offers = rollOffers(s, cfg)
-    if (offers.length === 0) s.nextDraftAt = Infinity
+    const roll = rollOffers(s, cfg)
+    if (roll.offers.length === 0 && roll.derived.length === 0) s.nextDraftAt = Infinity
     else {
-      s.pendingDraft = { kind: 'mutation', offers }
+      s.pendingDraft = { kind: 'mutation', ...roll }
       return
     }
   }
@@ -389,9 +428,30 @@ export function rerollDraft(s: GameState, cfg: Config): boolean {
   s.rerollsLeft -= 1
   s.pendingDraft =
     d.kind === 'mutation'
-      ? { kind: 'mutation', offers: rollOffers(s, cfg) }
+      ? { kind: 'mutation', ...rollOffers(s, cfg, d.derived) }
       : { kind: 'policy', offers: rollPolicies(s, cfg) }
   return true
+}
+
+/** 突然変異のドラフトを閉じ、次のしきい値を積む。変異と派生種のどちらを取っても同じ */
+function finishMutationDraft(s: GameState, cfg: Config): void {
+  s.draftCount += 1
+  s.nextDraftAt +=
+    cfg.mutation.draftThresholdBase *
+    Math.pow(cfg.mutation.draftThresholdGrowth, s.draftCount) *
+    s.policyFx.draftThresholdMult
+}
+
+/** 提示中のドラフトから派生種のカードを 1 枚選んで確定する */
+export function applyDerived(s: GameState, cfg: Config, index: number): void {
+  const d = s.pendingDraft
+  if (!d || d.kind !== 'mutation' || d.derived.length === 0) return
+  const chosen = d.derived[Math.max(0, Math.min(index, d.derived.length - 1))]
+  fuse(s.slots, chosen)
+  refreshBirthDist(s, cfg)
+  pushLog(s, 'draft', fill(t.log.derived, { name: derivedName(chosen) }), [chosen])
+  finishMutationDraft(s, cfg)
+  s.pendingDraft = null
 }
 
 /** 提示中のドラフトから 1 枚選んで確定する */
@@ -408,11 +468,7 @@ export function applyDraft(s: GameState, cfg: Config, index: number): void {
     pushLog(s, 'draft', fill(t.log.draft, { name: mutationName(chosen), rank: s.ranks.get(chosen.id)! }), [
       chosen,
     ])
-    s.draftCount += 1
-    s.nextDraftAt +=
-      cfg.mutation.draftThresholdBase *
-      Math.pow(cfg.mutation.draftThresholdGrowth, s.draftCount) *
-      s.policyFx.draftThresholdMult
+    finishMutationDraft(s, cfg)
   } else {
     const chosen = d.offers[i]
     s.policies.set(chosen.id, (s.policies.get(chosen.id) ?? 0) + 1)

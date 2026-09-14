@@ -1,4 +1,4 @@
-import { cachedPower, mutationsOfMask, nameOfMask } from '../../game/mutations.ts'
+import { cachedPower, mutationsOfMask, nameOfMask, partsOfMask } from '../../game/mutations.ts'
 import { bossHp, depthName } from '../../game/targets.ts'
 import { getConfig, getLastAward, setScreen } from '../../store/gameStore.ts'
 import { fill, t } from '../../text/index.ts'
@@ -92,7 +92,7 @@ export function ResultOverlay() {
           <div className="champion">
             <div className="panel-title">{t.result.championTitle}</div>
             <div className="champion-body">
-              <SharkIcon mutations={mutationsOfMask(s.slots, champion.mask)} height={64} />
+              <SharkIcon mutations={partsOfMask(s.slots, champion.mask)} height={64} />
               <div className="champion-info">
                 <div className="champion-name">{nameOfMask(s.slots, champion.mask)}</div>
                 <div className="champion-stats">
@@ -111,7 +111,7 @@ export function ResultOverlay() {
           <div className="panel-title">{t.result.speciesTitle}</div>
           {species.map((sp) => (
             <div key={sp.mask} className="stack">
-              <SharkIcon mutations={mutationsOfMask(s.slots, sp.mask)} height={30} />
+              <SharkIcon mutations={partsOfMask(s.slots, sp.mask)} height={30} />
               <span className="stack-name">{nameOfMask(s.slots, sp.mask)}</span>
               <span className="stack-count">{fmt(sp.count)}</span>
               <span className="stack-power">{fmt(sp.power)}</span>

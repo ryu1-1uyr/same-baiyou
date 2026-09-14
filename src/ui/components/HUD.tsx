@@ -1,9 +1,6 @@
-import { useState } from 'react'
-import { unclaimedCount } from '../../game/codex.ts'
 import {
   type AutoBuyMode,
   getAutoBuyMode,
-  getMeta,
   getSpeed,
   setAutoBuyMode,
   setSpeed,
@@ -13,7 +10,7 @@ import { depthName } from '../../game/targets.ts'
 import { fill, t } from '../../text/index.ts'
 import { mmss } from '../format.ts'
 import { useGame } from '../useGame.ts'
-import { CodexModal } from './CodexModal.tsx'
+import { CodexButton } from './CodexButton.tsx'
 
 const SPEEDS: Speed[] = [1, 2, 4]
 
@@ -23,8 +20,6 @@ export function HUD() {
   const name = depthName(s.depth)
   const inCulture = s.phase === 'culture'
   const autoMode = getAutoBuyMode()
-  const [codex, setCodex] = useState(false)
-  const unclaimed = unclaimedCount(getMeta())
   // 解禁したモードだけを並べる。1 つしかないなら切り替える意味がないので出さない
   const autoModes: Array<[AutoBuyMode, string]> = [
     ['off', t.speed.manual],
@@ -42,14 +37,7 @@ export function HUD() {
         </div>
       </div>
 
-      <button className="hud-codex" onClick={() => setCodex(true)} aria-label={t.codex.open}>
-        {t.codex.title}
-        {unclaimed > 0 && (
-          <span className="badge" title={fill(t.codex.unclaimed, { n: unclaimed })}>
-            {unclaimed}
-          </span>
-        )}
-      </button>
+      <CodexButton />
 
       <div className="speed" style={{ marginRight: 'auto' }}>
         {SPEEDS.filter((v) => v <= s.meta.maxSpeed).map((v) => (
@@ -82,8 +70,6 @@ export function HUD() {
           {mmss(s.timeLeft)}
         </div>
       )}
-
-      {codex && <CodexModal onClose={() => setCodex(false)} />}
     </div>
   )
 }

@@ -1876,7 +1876,7 @@
   line-height: 1;
   vertical-align: middle;
 }
-.hud-codex {
+.codex-open {
   display: inline-flex;
   align-items: center;
   font-family: var(--font-ui);
@@ -1888,7 +1888,7 @@
   padding: 2px var(--sp-3);
   cursor: pointer;
 }
-.hud-codex:hover {
+.codex-open:hover {
   color: var(--c-text);
   border-color: var(--c-line-hi);
 }

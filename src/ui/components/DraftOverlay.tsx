@@ -1,4 +1,4 @@
-import { maskOf, powerAt, rateAt } from '../../game/mutations.ts'
+import { powerAt, rateAt } from '../../game/mutations.ts'
 import { mutationName } from '../../game/mutations.ts'
 import { policyName } from '../../game/policies.ts'
 import { playSe } from '../../audio/se.ts'
@@ -67,7 +67,7 @@ export function DraftOverlay() {
                       chooseDraft(i)
                     }}
                   >
-                    <SharkIcon mask={maskOf(m)} height={40} />
+                    <SharkIcon mutations={[m]} height={40} />
                     <span className="card-rarity">{RARITY_LABEL[m.rarity]}</span>
                     <span className="card-name">{mutationName(m)}</span>
                     {s.meta.showNumbers ? (

@@ -64,9 +64,9 @@ export function simulate(opts: SimOptions = {}): SimResult {
 
   const stacks = [...s.inv.entries()]
     .map(([mask, count]) => ({
-      name: nameOfMask(mask),
+      name: nameOfMask(s.slots, mask),
       count,
-      power: powerOfMask(mask, s.ranks, cfg),
+      power: powerOfMask(s.slots, mask, s.ranks, cfg),
     }))
     .sort((a, b) => b.power * b.count - a.power * a.count)
     .slice(0, 5)

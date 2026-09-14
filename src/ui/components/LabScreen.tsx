@@ -11,7 +11,7 @@ import {
   NUMERIC_BY_ID,
   TREE,
 } from '../../game/meta.ts'
-import { MUTATION_BY_ID, maskOf } from '../../game/mutations.ts'
+import { MUTATION_BY_ID } from '../../game/mutations.ts'
 import { getMeta, purchaseNode, startNewRun } from '../../store/gameStore.ts'
 import { SharkIcon } from './SharkIcon.tsx'
 import { fmt } from '../format.ts'
@@ -157,7 +157,7 @@ export function LabScreen() {
             >
               {n.preview && (
                 <span className="node-preview">
-                  <SharkIcon mask={maskOf(MUTATION_BY_ID.get(n.preview)!)} height={30} />
+                  <SharkIcon mutations={[MUTATION_BY_ID.get(n.preview)!]} height={30} />
                 </span>
               )}
               <span className="node-name">

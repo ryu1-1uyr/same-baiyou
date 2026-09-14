@@ -3,6 +3,7 @@ import {
   cachedPower,
   type MutationMask,
   type MutationRanks,
+  type MutationSlots,
   type PowerCache,
   powerOfMask,
 } from './mutations.ts'
@@ -28,13 +29,14 @@ export function totalSharks(inv: Inventory): number {
 /** 在庫を戦闘力の昇順に並べる。出撃は必ず弱い個体から行う */
 export function sortedByPower(
   inv: Inventory,
+  slots: MutationSlots,
   ranks: MutationRanks,
   cfg: Config,
   cache?: PowerCache,
 ): Array<{ mask: MutationMask; power: number; count: number }> {
   const power = cache
-    ? (mask: MutationMask) => cachedPower(mask, ranks, cfg, cache)
-    : (mask: MutationMask) => powerOfMask(mask, ranks, cfg)
+    ? (mask: MutationMask) => cachedPower(slots, mask, ranks, cfg, cache)
+    : (mask: MutationMask) => powerOfMask(slots, mask, ranks, cfg)
   return [...inv.entries()]
     .map(([mask, count]) => ({ mask, count, power: power(mask) }))
     .sort((a, b) => a.power - b.power)
@@ -47,6 +49,7 @@ export function sortedByPower(
 export function launchWeakest(
   inv: Inventory,
   n: number,
+  slots: MutationSlots,
   ranks: MutationRanks,
   cfg: Config,
   cache?: PowerCache,
@@ -59,7 +62,8 @@ export function launchWeakest(
   if (n >= total) {
     let damage = 0
     for (const [mask, count] of inv) {
-      damage += count * (cache ? cachedPower(mask, ranks, cfg, cache) : powerOfMask(mask, ranks, cfg))
+      damage +=
+        count * (cache ? cachedPower(slots, mask, ranks, cfg, cache) : powerOfMask(slots, mask, ranks, cfg))
     }
     inv.clear()
     return { launched: total, damage }
@@ -68,7 +72,7 @@ export function launchWeakest(
   let remaining = n
   let damage = 0
   let launched = 0
-  for (const stack of sortedByPower(inv, ranks, cfg, cache)) {
+  for (const stack of sortedByPower(inv, slots, ranks, cfg, cache)) {
     if (remaining <= 0) break
     const take = Math.min(stack.count, remaining)
     damage += take * stack.power

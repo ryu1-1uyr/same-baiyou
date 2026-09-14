@@ -14,6 +14,7 @@ import { InvasionPanel } from './components/InvasionPanel.tsx'
 import { ProducePanel } from './components/ProducePanel.tsx'
 import { ResultOverlay } from './components/ResultOverlay.tsx'
 import { StockPanel } from './components/StockPanel.tsx'
+import { TitleScreen } from './components/TitleScreen.tsx'
 
 export function App() {
   useGame()
@@ -22,6 +23,14 @@ export function App() {
   useEffect(() => {
     startLoop()
   }, [])
+
+  if (getScreen() === 'title')
+    return (
+      <>
+        <TitleScreen />
+        <Copyright />
+      </>
+    )
 
   if (getScreen() === 'lab')
     return (

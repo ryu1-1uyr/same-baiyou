@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { stopBgm, updateBgm } from '../audio/bgm.ts'
 import { playSe } from '../audio/se.ts'
 import type { GameState } from '../game/state.ts'
+import { getScreen } from '../store/gameStore.ts'
 import { useGame } from './useGame.ts'
 
 /** 深度が反転する境目。bgm.ts / atmosphere.ts と同じ値 */
@@ -59,7 +60,8 @@ export function useSound(): void {
       if (s.phase === 'over' && !p.over) playSe('beam')
     }
 
-    if (s.phase === 'over') {
+    // タイトルではまだランが始まっていない
+    if (s.phase === 'over' || getScreen() === 'title') {
       stopBgm()
       return
     }

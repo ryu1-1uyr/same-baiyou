@@ -1746,3 +1746,100 @@
   border-color: var(--c-danger);
   background: color-mix(in srgb, var(--c-danger) 14%, transparent);
 }
+
+/* ---- タイトル ---- */
+.title {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-5);
+  padding: var(--sp-5) var(--sp-4);
+  background: radial-gradient(ellipse at 50% 35%, #45e0c814, transparent 60%), var(--c-bg);
+}
+.title-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.title-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: normal;
+  letter-spacing: 0.04em;
+  color: var(--c-text);
+  text-align: center;
+  text-shadow: 0 0 18px #45e0c855;
+}
+.title-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: min(280px, 100%);
+}
+.title-item {
+  padding: var(--sp-3) var(--sp-4);
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  color: var(--c-text);
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-1);
+  cursor: pointer;
+  transition:
+    border-color 120ms,
+    background-color 120ms;
+}
+.title-item:hover,
+.title-item:focus-visible {
+  border-color: var(--c-line-hi);
+  background: var(--c-line);
+}
+.title-item[data-primary='true'] {
+  color: var(--c-culture);
+  border-color: color-mix(in srgb, var(--c-culture) 55%, var(--c-line));
+}
+.title-dialog {
+  max-width: 520px;
+  max-height: calc(100dvh - 2 * var(--sp-5));
+  overflow-y: auto;
+}
+.title-dialog .btn {
+  align-self: center;
+}
+.help-steps {
+  margin: 0;
+  padding-left: 1.6em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.help-step::marker {
+  font-family: var(--font-num);
+  color: var(--c-culture);
+}
+.help-head {
+  font-size: var(--fs-md);
+  color: var(--c-text);
+}
+.help-body {
+  font-size: var(--fs-sm);
+  color: var(--c-text-dim);
+  line-height: 1.6;
+}
+.title-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.title-options .audio-row {
+  grid-template-columns: 5em 1fr 2.5em;
+  font-size: var(--fs-sm);
+}
+.title-options .audio-mute {
+  align-self: flex-start;
+}

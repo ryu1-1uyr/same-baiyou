@@ -22,7 +22,7 @@ import { loadMeta, resetMeta, saveMeta } from '../meta/save.ts'
 
 export type Speed = 1 | 2 | 4
 
-export type Screen = 'run' | 'lab'
+export type Screen = 'title' | 'run' | 'lab'
 
 let meta: MetaState = loadMeta()
 const baseCfg: Config = DEFAULT_CONFIG
@@ -31,7 +31,7 @@ let state: GameState = createState(cfg, Math.floor(Math.random() * 1e9), metaEff
 let speed: Speed = 1
 let version = 0
 let running = false
-let screen: Screen = 'run'
+let screen: Screen = 'title'
 /** 直近のランで得た研究予算。リザルト表示に使う */
 let lastAward = 0
 /**
@@ -266,7 +266,8 @@ function frame(now: number): void {
   let ticked = false
   while (acc >= TICK) {
     acc -= TICK
-    if (state.phase === 'over' || state.pendingDraft) {
+    // タイトル表示中は培養フェーズの持ち時間を減らさない
+    if (screen === 'title' || state.phase === 'over' || state.pendingDraft) {
       acc = 0
       break
     }

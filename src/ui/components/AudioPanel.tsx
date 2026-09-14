@@ -31,26 +31,7 @@ export function AudioPanel() {
       {open && (
         <div className="audio-body panel">
           <div className="panel-title">{t.audio.title}</div>
-          {ROWS.map(([ch, label]) => {
-            const pct = Math.round(cfg[ch] * 100)
-            return (
-              <label key={ch} className="audio-row">
-                <span className="audio-label">{label}</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={pct}
-                  aria-label={label}
-                  onChange={(e) => setVolume(ch, Number(e.target.value) / 100)}
-                />
-                <span className="audio-value">{pct}</span>
-              </label>
-            )
-          })}
-          <button className="audio-mute" data-on={cfg.muted} onClick={() => setMuted(!cfg.muted)}>
-            {cfg.muted ? t.audio.unmute : t.audio.mute}
-          </button>
+          <AudioControls />
         </div>
       )}
 
@@ -65,5 +46,36 @@ export function AudioPanel() {
         <Sprite kind="ui" id={cfg.muted ? 'mute' : 'sound'} size={32} />
       </button>
     </div>
+  )
+}
+
+/** 音量スライダーとミュート。隅のパネルとタイトルのオプションで共用する */
+export function AudioControls() {
+  useSyncExternalStore(subscribeAudio, getAudioVersion, getAudioVersion)
+  const cfg = getAudioSettings()
+
+  return (
+    <>
+      {ROWS.map(([ch, label]) => {
+        const pct = Math.round(cfg[ch] * 100)
+        return (
+          <label key={ch} className="audio-row">
+            <span className="audio-label">{label}</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={pct}
+              aria-label={label}
+              onChange={(e) => setVolume(ch, Number(e.target.value) / 100)}
+            />
+            <span className="audio-value">{pct}</span>
+          </label>
+        )
+      })}
+      <button className="audio-mute" data-on={cfg.muted} onClick={() => setMuted(!cfg.muted)}>
+        {cfg.muted ? t.audio.unmute : t.audio.mute}
+      </button>
+    </>
   )
 }

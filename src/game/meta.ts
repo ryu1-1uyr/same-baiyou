@@ -32,6 +32,10 @@ export type MetaState = {
   claimed: string[]
   /** 図鑑で開いた派生種のヒント（`派生種:材料`） */
   hints: string[]
+  /** リスク取引を解禁したあと、ランで出すか。研究所で切り替え、次のランから効く */
+  riskEnabled: boolean
+  /** リスクカードの主任の説明を見たか。初回ラン以外で出る唯一の説明なので、セーブに残す */
+  riskTutorialSeen: boolean
 }
 
 export function createMeta(): MetaState {
@@ -45,6 +49,8 @@ export function createMeta(): MetaState {
     discovered: [],
     claimed: [],
     hints: [],
+    riskEnabled: true,
+    riskTutorialSeen: false,
   }
 }
 
@@ -281,6 +287,12 @@ export const UNLOCKS: UnlockDef[] = [
     kind: 'unique',
   },
   {
+    // リスクカードは周回をかなり速くするので、序盤には置かない（TASKS §5.2）
+    id: 'riskMode',
+    cost: 5000,
+    kind: 'unique',
+  },
+  {
     id: 'prototype',
     cost: 20000,
     kind: 'unique',
@@ -323,9 +335,6 @@ export const UNLOCKS: UnlockDef[] = [
     requires: 'autoBuyOne',
   },
   // 派生種の解禁。系統をすべて解禁した先に置く。コストは試遊前の仮の値
-  { id: 'derived_1', cost: 60000, kind: 'unique', requires: 'family_disaster' },
-  { id: 'derived_2', cost: 200000, kind: 'unique', requires: 'derived_1' },
-  { id: 'derived_3', cost: 800000, kind: 'unique', requires: 'derived_2' },
 ]
 
 export const UNLOCK_BY_ID = new Map<string, UnlockDef>(UNLOCKS.map((u) => [u.id, u]))
@@ -381,8 +390,8 @@ export type MetaEffects = {
   overkillMult: number
   /** ラン終了時に在庫をすべて投入する */
   lastStand: boolean
-  /** 作れる派生種の段。0 なら派生種は出ない */
-  derivedTier: 0 | 1 | 2 | 3
+  /** リスクカードを出すか（解禁済みかつ研究所でオン） */
+  riskMode: boolean
 }
 
 export function metaEffects(m: MetaState): MetaEffects {
@@ -425,7 +434,7 @@ export function metaEffects(m: MetaState): MetaEffects {
     reserveSeconds: has('reservePower') ? 20 : 0,
     overkillMult: has('chainCollapse') ? 2 : 1,
     lastStand: has('lastStand'),
-    derivedTier: has('derived_3') ? 3 : has('derived_2') ? 2 : has('derived_1') ? 1 : 0,
+    riskMode: has('riskMode') && m.riskEnabled,
   }
 }
 
@@ -540,7 +549,8 @@ export const TREE: TreeNode[] = [
   { id: 'launcherSynergy', branch: 'raid', col: 3, row: 2, requires: ['lastStand'] },
   { id: 'reservePower', branch: 'raid', col: 3, row: 3, requires: ['launcherSynergy'] },
   { id: 'chainCollapse', branch: 'raid', col: 3, row: 4, requires: ['reservePower'] },
-  { id: 'extraSkip', branch: 'raid', col: 3, row: 5, requires: ['chainCollapse'] },
+  { id: 'riskMode', branch: 'raid', col: 3, row: 5, requires: ['chainCollapse'] },
+  { id: 'extraSkip', branch: 'raid', col: 3, row: 6, requires: ['riskMode'] },
 
   // 実験 — ドラフトへの干渉。まず「測れるようにする」ところから始まる
   { id: 'analysis', branch: 'lab', col: 4, row: 0, requires: [] },
@@ -555,9 +565,6 @@ export const TREE: TreeNode[] = [
   { id: 'family_mech', branch: 'fam', col: 5, row: 1, requires: ['family_abyss'], preview: 'mecha' },
   { id: 'family_cosmic', branch: 'fam', col: 5, row: 2, requires: ['family_mech'], preview: 'alien' },
   { id: 'family_disaster', branch: 'fam', col: 5, row: 3, requires: ['family_cosmic'], preview: 'tornado' },
-  { id: 'derived_1', branch: 'fam', col: 5, row: 4, requires: ['family_disaster'] },
-  { id: 'derived_2', branch: 'fam', col: 5, row: 5, requires: ['derived_1'] },
-  { id: 'derived_3', branch: 'fam', col: 5, row: 6, requires: ['derived_2'] },
 
   // 運用 — 周回の速度
   { id: 'speed2', branch: 'ops', col: 6, row: 0, requires: [] },

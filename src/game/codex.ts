@@ -5,9 +5,11 @@ import {
   type DerivedId,
   type DerivedTier,
   RECIPE_RANK,
+  recipeOpen,
 } from './derived.ts'
 import type { MetaState } from './meta.ts'
 import {
+  type Family,
   MUTATION_BY_ID,
   type MutationDef,
   type MutationId,
@@ -35,7 +37,7 @@ export const CODEX_REWARD: Record<Rarity, number> = {
   legendary: 2000,
 }
 
-/** 派生種の研究予算。解禁の段ごと。仮の値 */
+/** 派生種の研究予算。難しさの段ごと。仮の値 */
 export const DERIVED_REWARD: Record<DerivedTier, number> = {
   1: 1000,
   2: 3000,
@@ -93,12 +95,16 @@ export function isHintOpen(meta: MetaState, def: DerivedDef, material: MutationI
 
 /**
  * いまのランクで開くヒントを開く。新しく開いた材料を返す（観測記録に流すため）。
- * 解禁していない段のレシピは対象にしない。
+ * まだ作れないレシピ（材料の系統が解禁されていない）は対象にしない。
  */
-export function revealHints(meta: MetaState, ranks: MutationRanks, tier: number): MutationDef[] {
+export function revealHints(
+  meta: MetaState,
+  ranks: MutationRanks,
+  families: ReadonlySet<Family>,
+): MutationDef[] {
   const opened: MutationDef[] = []
   for (const def of DERIVED) {
-    if (def.tier > tier) continue
+    if (!recipeOpen(def, families)) continue
     for (const id of def.materials) {
       if ((ranks.get(id) ?? 0) < RECIPE_RANK || isHintOpen(meta, def, id)) continue
       meta.hints.push(hintKey(def, id))

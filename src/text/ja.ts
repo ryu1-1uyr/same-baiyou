@@ -61,8 +61,6 @@ export const ja = {
     derivedTitle: '派生種',
     recipe: '{a} × {b}',
     material: '{name} R{rank}',
-    tier: '派生研究 {tier}',
-    locked: '研究所で解禁',
   },
 
   audio: {
@@ -572,22 +570,15 @@ export const ja = {
     lastStand: { name: '緊急浮上', detail: 'ラン終了時、在庫の検体をすべて投入してから終わる' },
     reservePower: { name: '予備電源', detail: '制限時間が尽きた瞬間、1 ラン に 1 回だけ +20 秒' },
     chainCollapse: { name: '連鎖崩壊', detail: '建物を破壊した際の余剰ダメージが、次の建物に 2 倍で通る' },
+    riskMode: {
+      name: '闇取引',
+      detail:
+        'ボス撃破時と予備電源の作動時に、代償と引き換えのリスクカードが出る。研究所でオン・オフを切り替えられる',
+    },
     tankSynergy: { name: '温度管理', detail: '培養槽 1 個につき培養液の生産 +2%' },
     feederSynergy: { name: '給餌連動', detail: '給餌装置 1 個につき培養液の生産 +3%' },
     breederSynergy: { name: '過密飼育', detail: '繁殖槽 1 個につき検体の生産速度 +2%' },
     launcherSynergy: { name: '射出斉射', detail: '射出管 1 個につき投入速度 +3%' },
-    derived_1: {
-      name: '派生研究 I',
-      detail: '生体系の変異を掛け合わせた派生種を作れるようになる',
-    },
-    derived_2: {
-      name: '派生研究 II',
-      detail: '系統をまたいで変異を掛け合わせた派生種を作れるようになる',
-    },
-    derived_3: {
-      name: '派生研究 III',
-      detail: 'レジェンダリーを含む派生種を作れるようになる',
-    },
   },
 
   /*
@@ -727,6 +718,9 @@ export const ja = {
     bestDepth: '最高突破深度 {n}',
     lifetime: '累計予算 {n}',
     start: '次の実験を開始する',
+    riskOn: '闇取引 ON',
+    riskOff: '闇取引 OFF',
+    riskToggle: 'リスクカードを次の実験から出すかどうか',
     taken: '取得済み',
     short: 'あと {n}',
     max: 'MAX',

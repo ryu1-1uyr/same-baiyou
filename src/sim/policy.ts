@@ -11,7 +11,7 @@ import {
   unlockAvailable,
   upgradeCost,
 } from '../game/meta.ts'
-import { DERIVED, type DerivedDef, RECIPE_RANK } from '../game/derived.ts'
+import { DERIVED, type DerivedDef, RECIPE_RANK, recipeOpen } from '../game/derived.ts'
 import { expectedPower, MUTATION_BY_ID, type MutationDef } from '../game/mutations.ts'
 import type { GameState } from '../game/state.ts'
 
@@ -150,12 +150,7 @@ export function makeDraftChooser(name: DraftPolicyName) {
 
 /** 解禁済みで、まだ取っていない派生種のレシピ */
 function openRecipes(s: GameState): DerivedDef[] {
-  return DERIVED.filter(
-    (d) =>
-      d.tier <= s.meta.derivedTier &&
-      !s.slots.fused.includes(d) &&
-      d.materials.every((id) => s.meta.families.has(MUTATION_BY_ID.get(id)!.family)),
-  )
+  return DERIVED.filter((d) => recipeOpen(d, s.meta.families) && !s.slots.fused.includes(d))
 }
 
 /** そのカードが、レシピの材料をまだ条件のランクまで重ねていないものか */

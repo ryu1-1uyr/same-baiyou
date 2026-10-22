@@ -1,6 +1,13 @@
 import { useEffect } from 'react'
 import { type CodexId, codexReward, isClaimed, isDiscovered, isHintOpen } from '../../game/codex.ts'
-import { DERIVED, type DerivedDef, derivedName, materialsOf, RECIPE_RANK } from '../../game/derived.ts'
+import {
+  DERIVED,
+  type DerivedDef,
+  derivedName,
+  materialsOf,
+  RECIPE_RANK,
+  recipeOpen,
+} from '../../game/derived.ts'
 import { metaEffects } from '../../game/meta.ts'
 import {
   type Family,
@@ -27,12 +34,10 @@ const PLAIN: readonly MutationDef[] = []
 export function CodexModal({ onClose }: { onClose: () => void }) {
   useGame()
   const meta = getMeta()
-  // 派生種は解禁するまで欄ごと出さない（存在を知る前に ？？？ が並ぶと、何の欄か分からないため）
-  const tier = metaEffects(meta).derivedTier
-  const entries: readonly CodexId[] = [
-    ...MUTATIONS.map((m) => m.id),
-    ...(tier > 0 ? DERIVED.map((d) => d.id) : []),
-  ]
+  // 派生種は作れるようになったものから並べる。系統を解禁するたびに欄が増え、幅が広がったのが目に見える
+  const families = metaEffects(meta).families
+  const openDerived = DERIVED.filter((d) => recipeOpen(d, families))
+  const entries: readonly CodexId[] = [...MUTATIONS.map((m) => m.id), ...openDerived.map((d) => d.id)]
   const found = entries.filter((id) => isDiscovered(meta, id)).length
 
   useEffect(() => {
@@ -60,16 +65,14 @@ export function CodexModal({ onClose }: { onClose: () => void }) {
         </section>
       ))}
 
-      {tier > 0 && (
-        <section className="codex-family">
-          <div className="panel-title">{t.codex.derivedTitle}</div>
-          <div className="codex-grid">
-            {DERIVED.map((d) => (
-              <DerivedEntry key={d.id} def={d} unlocked={d.tier <= tier} />
-            ))}
-          </div>
-        </section>
-      )}
+      <section className="codex-family">
+        <div className="panel-title">{t.codex.derivedTitle}</div>
+        <div className="codex-grid">
+          {openDerived.map((d) => (
+            <DerivedEntry key={d.id} def={d} />
+          ))}
+        </div>
+      </section>
     </Dialog>
   )
 }
@@ -101,9 +104,7 @@ function CodexEntry({ def }: { def: MutationDef }) {
   )
 }
 
-const TIER_LABEL = { 1: 'I', 2: 'II', 3: 'III' } as const
-
-function DerivedEntry({ def, unlocked }: { def: DerivedDef; unlocked: boolean }) {
+function DerivedEntry({ def }: { def: DerivedDef }) {
   const meta = getMeta()
   const [a, b] = materialsOf(def)
 
@@ -128,15 +129,11 @@ function DerivedEntry({ def, unlocked }: { def: DerivedDef; unlocked: boolean })
       ? fill(t.codex.material, { name: mutationName(m), rank: RECIPE_RANK })
       : t.codex.unknown
   return (
-    <div className="codex-entry" data-found="false" data-derived="true" data-locked={!unlocked}>
+    <div className="codex-entry" data-found="false" data-derived="true">
       <span className="codex-icon">
         <SharkIcon mutations={PLAIN} height={28} />
       </span>
-      <span className="codex-name">
-        {unlocked
-          ? t.codex.unknown
-          : `${fill(t.codex.tier, { tier: TIER_LABEL[def.tier] })} — ${t.codex.locked}`}
-      </span>
+      <span className="codex-name">{t.codex.unknown}</span>
       <span className="codex-recipe">{fill(t.codex.recipe, { a: material(a), b: material(b) })}</span>
     </div>
   )

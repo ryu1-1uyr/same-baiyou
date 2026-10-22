@@ -20,6 +20,9 @@ export function loadMeta(): MetaState {
       discovered: Array.isArray(parsed.discovered) ? [...parsed.discovered] : base.discovered,
       claimed: Array.isArray(parsed.claimed) ? [...parsed.claimed] : base.claimed,
       hints: Array.isArray(parsed.hints) ? [...parsed.hints] : base.hints,
+      // 切り替えより前のセーブには無い。解禁した直後はオンにしておく
+      riskEnabled: typeof parsed.riskEnabled === 'boolean' ? parsed.riskEnabled : base.riskEnabled,
+      riskTutorialSeen: parsed.riskTutorialSeen === true,
     }
   } catch {
     // プライベートウィンドウなどで localStorage が使えない場合は初期状態で続行する

@@ -12,7 +12,7 @@ import { simulate } from './run.ts'
  *
  * 恒久強化は progress.ts と同じく「安い順に買う」で積み、
  * mid は災害系を解禁した直後、late は 25 ラン目の状態を使う。
- * どちらも派生研究 I〜III は強制的に解禁して、全レシピを対象にする。
+ * レシピは材料の系統が解禁済みのものだけが対象になる（mid は災害系まで解禁済みなので全レシピ）。
  *
  * プレイヤーは 2 通り。
  *  chaseRecipe … レシピを狙う（材料を優先して重ね、派生カードは必ず取る）
@@ -34,9 +34,6 @@ function buildMeta(): MetaState {
     meta.bestDepth = Math.max(meta.bestDepth, r.clearedDepth)
     spend(meta)
     if (stage === 'mid' && meta.unlocked.includes('family_disaster')) break
-  }
-  for (const id of ['derived_1', 'derived_2', 'derived_3']) {
-    if (!meta.unlocked.includes(id)) meta.unlocked.push(id)
   }
   return meta
 }

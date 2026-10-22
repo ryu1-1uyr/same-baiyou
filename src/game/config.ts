@@ -80,6 +80,11 @@ export type Config = {
     thresholdGrowth: number
     draftSize: number
   }
+
+  risk: {
+    /** ボス撃破時・予備電源の発動時に提示するリスクカードの枚数 */
+    draftSize: number
+  }
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -135,6 +140,10 @@ export const DEFAULT_CONFIG: Config = {
     thresholdBase: 30,
     thresholdGrowth: 3.6,
     draftSize: 3,
+  },
+
+  risk: {
+    draftSize: 2,
   },
 }
 

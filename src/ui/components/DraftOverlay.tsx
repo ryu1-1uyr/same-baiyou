@@ -1,9 +1,10 @@
 import { powerAt, rateAt } from '../../game/mutations.ts'
 import { mutationName } from '../../game/mutations.ts'
 import { policyName } from '../../game/policies.ts'
+import { riskCost, riskName } from '../../game/risks.ts'
 import { playSe } from '../../audio/se.ts'
 import { derivedName, materialsOf } from '../../game/derived.ts'
-import { chooseDerived, chooseDraft, getConfig, reroll } from '../../store/gameStore.ts'
+import { chooseDerived, chooseDraft, getConfig, reroll, skip } from '../../store/gameStore.ts'
 import { fmt } from '../format.ts'
 import { fill, t } from '../../text/index.ts'
 import { useGame } from '../useGame.ts'
@@ -18,7 +19,7 @@ export const RARITY_LABEL: Record<string, string> = {
 }
 
 /**
- * ドラフト。突然変異（検体側）と研究方針（施設側）の 2 種類が同じ枠に出る。
+ * ドラフト。突然変異（検体側）・研究方針（施設側）・リスクカード（侵略中の取引）の 3 種類が同じ枠に出る。
  * 見分けが付かないと「またカードか」になるため、見出し・色・添える絵で峻別する。
  */
 export function DraftOverlay() {
@@ -26,6 +27,68 @@ export function DraftOverlay() {
   const cfg = getConfig()
   const d = s.pendingDraft
   if (!d) return null
+
+  if (d.kind === 'risk') {
+    const sub = d.reason === 'reserve' ? t.draft.riskSubReserve : t.draft.riskSubBoss
+    return (
+      <div className="overlay">
+        <div className="modal" data-draft="risk">
+          <div>
+            <div className="modal-title">{t.draft.riskTitle}</div>
+            <div className="modal-sub">{fill(sub, { sec: Math.max(0, Math.ceil(s.timeLeft)) })}</div>
+          </div>
+
+          <div className="draft-actions">
+            {s.rerollsLeft > 0 && (
+              <button
+                className="reroll"
+                onClick={() => {
+                  playSe('buy')
+                  reroll()
+                }}
+              >
+                {fill(t.draft.reroll, { n: s.rerollsLeft })}
+              </button>
+            )}
+            {s.risk.skipsLeft > 0 && (
+              <button
+                className="reroll"
+                onClick={() => {
+                  playSe('buy')
+                  skip()
+                }}
+              >
+                {fill(t.draft.skip, { n: s.risk.skipsLeft })}
+              </button>
+            )}
+          </div>
+
+          <div className="cards">
+            {d.offers.map((r, i) => (
+              <button
+                key={r.id}
+                className="card"
+                data-kind="risk"
+                onClick={() => {
+                  playSe('choose')
+                  chooseDraft(i)
+                }}
+              >
+                <span className="card-rarity">{t.draft.riskLabel}</span>
+                <span className="card-name">{riskName(r)}</span>
+                <span className="card-effect">
+                  {t.draft.riskGain}: {r.gain}
+                </span>
+                <span className="card-cost">
+                  {t.draft.riskCost}: {riskCost(r, cfg)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const isPolicy = d.kind === 'policy'
 

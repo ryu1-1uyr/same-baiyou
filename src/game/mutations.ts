@@ -319,6 +319,7 @@ export function birthDistribution(
   slots: MutationSlots,
   ranks: MutationRanks,
   cfg: Config,
+  rateMult: (id: MutationId) => number = () => 1,
 ): Array<[MutationMask, number]> {
   const cap = DIST_KEEP_COMMON + DIST_KEEP_STRONG
   // [mask, 確率, 戦闘力]。戦闘力は間引きの順位付けにだけ使う
@@ -326,7 +327,8 @@ export function birthDistribution(
   for (const def of MUTATIONS) {
     const rank = ranks.get(def.id) ?? 0
     if (rank <= 0) continue
-    const p = rateAt(def, rank, cfg)
+    // 倍率を掛けても頭打ちは rateAt と同じ 90%
+    const p = Math.min(0.9, rateAt(def, rank, cfg) * rateMult(def.id))
     const mult = powerAt(def, rank, cfg)
     const next: Array<[MutationMask, number, number]> = []
     for (const [mask, prob, pw] of dist) {

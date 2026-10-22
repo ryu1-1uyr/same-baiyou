@@ -73,8 +73,16 @@ export const NUMERIC_UPGRADES: NumericUpgrade[] = [
   {
     id: 'extraReroll',
     detail: (lv) => fill(t.upgrade.extraReroll.detail, { n: 1 + lv }),
-    baseCost: 3000,
-    costGrowth: 2.1,
+    baseCost: 6000,
+    costGrowth: 2.8,
+    maxLevel: 9,
+  },
+  {
+    // 予備実験枠と同じ伸びで、初期コストだけ安くする
+    id: 'extraSkip',
+    detail: (lv) => fill(t.upgrade.extraSkip.detail, { n: 1 + lv }),
+    baseCost: 4000,
+    costGrowth: 2.8,
     maxLevel: 9,
   },
   {
@@ -361,8 +369,10 @@ export type MetaEffects = {
   extraOffers: number
   /** 突然変異の発現率と戦闘力倍率を表示してよいか */
   showNumbers: boolean
-  /** 1 ラン に使えるドラフトの引き直し回数 */
+  /** 1 ラン に使えるドラフトの引き直し回数。リスクカードの引き直しと共有する */
   rerolls: number
+  /** 1 ラン にリスクカードを見送れる回数 */
+  skips: number
   /** 変異のランク上限 */
   maxRank: number
   /** 制限時間切れを 1 回だけ猶予する秒数。0 なら無効 */
@@ -410,6 +420,7 @@ export function metaEffects(m: MetaState): MetaEffects {
     extraOffers: has('extraOffer') ? 1 : 0,
     showNumbers: has('analysis'),
     rerolls: has('reroll') ? 1 + lv('extraReroll') : 0,
+    skips: 1 + lv('extraSkip'),
     maxRank: has('prototype') ? 4 : 3,
     reserveSeconds: has('reservePower') ? 20 : 0,
     overkillMult: has('chainCollapse') ? 2 : 1,
@@ -529,6 +540,7 @@ export const TREE: TreeNode[] = [
   { id: 'launcherSynergy', branch: 'raid', col: 3, row: 2, requires: ['lastStand'] },
   { id: 'reservePower', branch: 'raid', col: 3, row: 3, requires: ['launcherSynergy'] },
   { id: 'chainCollapse', branch: 'raid', col: 3, row: 4, requires: ['reservePower'] },
+  { id: 'extraSkip', branch: 'raid', col: 3, row: 5, requires: ['chainCollapse'] },
 
   // 実験 — ドラフトへの干渉。まず「測れるようにする」ところから始まる
   { id: 'analysis', branch: 'lab', col: 4, row: 0, requires: [] },

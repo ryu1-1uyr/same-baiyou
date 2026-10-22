@@ -473,9 +473,59 @@ export const ja = {
     preserve: { name: '標本の保存', detail: 'ラン終了時の研究予算 +{pct}%' },
   },
 
+  /** 侵略中のリスク付きカード。代償と見返りの文言は数値を src/game/risks.ts から埋める */
+  risk: {
+    jamming: {
+      name: '逆探知の妨害',
+      cost: '{sec} 秒間、検体の生産速度 −{pct}%',
+      gain: '制限時間 +{time} 秒',
+    },
+    falsify: {
+      name: '報告書の改ざん',
+      cost: 'ラン終了時の研究予算 −{pct}%',
+      gain: '制限時間 +{time} 秒',
+    },
+    borrow: {
+      name: '電源の前借り',
+      cost: '以降、深度突破時の継ぎ足しが +{from} 秒 → +{to} 秒',
+      gain: '今すぐ制限時間 +{time} 秒',
+    },
+    overdose: {
+      name: '過剰投与',
+      cost: '効果が切れたあと {sec} 秒間、全検体の戦闘力 ×{down}',
+      gain: '{sec} 秒間、全検体の戦闘力 ×{up}',
+    },
+    overdrive: {
+      name: '暴走射出',
+      cost: '射出管の {pct}% が壊れる',
+      gain: '{sec} 秒間、投入速度 ×{mult}',
+    },
+    cannibal: {
+      name: '共食い',
+      cost: '繁殖槽の {pct}% を取り壊す',
+      gain: 'このラン の間、全検体の戦闘力 ×{mult}',
+    },
+    forbidden: {
+      name: '禁じられた交配',
+      cost: '保有変異 1 つ（ランダム）のランク −1。R1 なら失う',
+      gain: '別の保有変異 1 つ（ランダム）のランク +1',
+    },
+    unapproved: {
+      name: '未承認の遺伝子',
+      cost: 'このラン の間、全変異の発現率 ×{mult}',
+      gain: '持っていない rare 以上の変異を 1 つ得る',
+    },
+    runaway: {
+      name: '遺伝子の暴走',
+      cost: '以降に生まれる検体の {min}〜{max}%（ランダム）が失敗作になる',
+      gain: '保有変異 1 つ（ランダム）の発現率 ×{mult}',
+    },
+  },
+
   upgrade: {
     clickPower: { name: 'クリック増幅', detail: '培養液の手動採取 ×{mult}' },
     extraReroll: { name: '予備実験枠', detail: 'ドラフトの引き直しが 1 ラン に {n} 回になる' },
+    extraSkip: { name: '揉み消し', detail: 'リスクカードを 1 ラン に {n} 回まで見送れる' },
     critChance: { name: '採取の勘', detail: '手動採取の {pct}% が会心になる' },
     critPower: { name: '一点集中', detail: '会心した採取が ×{mult}' },
     startTanks: { name: '培養槽の常設', detail: '開始時に培養槽を {n} 個持つ' },
@@ -586,6 +636,12 @@ export const ja = {
     traced: '逆探知が完了。軌道より照射を確認',
     derived: '派生種 {name} を確認',
     hint: '図鑑に手がかり — {material} R{rank} × ？？？',
+    risk: '{name} を実行',
+    riskSkip: 'リスクカードを見送った',
+    forbidden: '{lost} が R{lostRank} に、{gained} が R{gainedRank} に',
+    forbiddenLost: '{lost} を失い、{gained} が R{gainedRank} に',
+    unapproved: '{name} を確認  R1',
+    runaway: '{name} の発現率 ×{mult}  失敗作 {pct}%',
   },
 
   draft: {
@@ -600,6 +656,13 @@ export const ja = {
     derivedLabel: 'DERIVED',
     derivedRecipe: '{a} × {b}',
     derivedEffect: '両方を持つ個体の戦闘力 ×{bonus}',
+    riskTitle: 'リスクを取るか',
+    riskSubBoss: 'ボス撃破 — 逆探知まで残り {sec} 秒',
+    riskSubReserve: '予備電源が作動 — 逆探知まで残り {sec} 秒',
+    riskLabel: 'RISK',
+    riskCost: '代償',
+    riskGain: '見返り',
+    skip: '見送る（残り {n} 回）',
   },
 
   stock: {

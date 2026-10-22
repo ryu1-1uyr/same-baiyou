@@ -602,6 +602,31 @@
   color: var(--c-culture);
 }
 
+/* リスクカードは代償つきの取引。変異とも方針とも違う警告色で、代償の行を目立たせる */
+.card[data-kind='risk'] {
+  border-left: 3px solid var(--c-danger);
+  background: linear-gradient(180deg, #ff5f4a1a, var(--c-bg-deep) 40%);
+}
+.card[data-kind='risk'] .card-rarity,
+.card-cost {
+  color: var(--c-danger);
+}
+.card-cost {
+  font-size: var(--fs-xs);
+}
+.modal[data-draft='risk'] .modal-title {
+  color: var(--c-danger);
+}
+/* 提示は 2 枚。3 列のままだと右に空きができる */
+.modal[data-draft='risk'] .cards {
+  grid-template-columns: repeat(2, 1fr);
+}
+.draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
 .card[data-rarity='common'] {
   border-left: 3px solid var(--c-common);
 }
@@ -1335,6 +1360,12 @@
 }
 .log-row[data-kind='policy'] .log-text {
   color: var(--c-culture);
+}
+.log-row[data-kind='risk'] {
+  border-left-color: var(--c-danger);
+}
+.log-row[data-kind='risk'] .log-text {
+  color: var(--c-danger);
 }
 .log-row[data-kind='birth'] {
   border-left-color: var(--c-legendary);

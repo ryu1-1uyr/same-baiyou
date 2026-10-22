@@ -22,6 +22,7 @@ import {
   critChance,
   critMult,
   rerollDraft,
+  skipRisk,
   tick,
 } from '../game/tick.ts'
 import { fill, t } from '../text/index.ts'
@@ -252,6 +253,10 @@ export function reroll(): void {
   if (rerollDraft(state, cfg)) emit()
 }
 
+export function skip(): void {
+  if (skipRisk(state)) emit()
+}
+
 export function chooseDraft(index: number): void {
   applyDraft(state, cfg, index)
   recordCodex()
@@ -295,7 +300,9 @@ export function startNewRun(): void {
 
 /** ラン終了時に一度だけ呼ばれ、研究予算を確定する */
 function awardRun(): void {
-  lastAward = Math.floor(budgetFor(state.score, state.clearedDepth) * state.policyFx.budgetMult)
+  lastAward = Math.floor(
+    budgetFor(state.score, state.clearedDepth) * state.policyFx.budgetMult * state.risk.budgetMult,
+  )
   meta.budget += lastAward
   meta.lifetimeBudget += lastAward
   meta.runs += 1

@@ -24,6 +24,7 @@ import {
   powerOfMask,
 } from './mutations.ts'
 import { POLICIES, type PolicyDef, policyName } from './policies.ts'
+import { applyRisk, riskMult, rollRisks } from './risks.ts'
 import { fill, t } from '../text/index.ts'
 import { type GameState, pushLog, refreshBirthDist, refreshPolicyFx, rng } from './state.ts'
 import { bossHp, depthNames, perDepthTime, targetCount, targetHp } from './targets.ts'
@@ -137,7 +138,7 @@ export function sharkRate(s: GameState): number {
     if (b.sharkRateMult) mult += b.sharkRateMult * s.buildings[i]
   })
   const synergy = s.meta.breederSynergy ? 1 + owned(s, 'breeder') * 0.02 : 1
-  return base * mult * s.meta.sharkRateMult * synergy * s.policyFx.sharkRateMult
+  return base * mult * s.meta.sharkRateMult * synergy * s.policyFx.sharkRateMult * riskMult(s, 'sharkRate')
 }
 
 export function launchRate(s: GameState, cfg: Config): number {
@@ -146,7 +147,7 @@ export function launchRate(s: GameState, cfg: Config): number {
     if (b.launchRate) r += b.launchRate * s.buildings[i]
   })
   const synergy = s.meta.launcherSynergy ? 1 + owned(s, 'launcher') * 0.03 : 1
-  return r * s.meta.launchMult * synergy * s.policyFx.launchMult
+  return r * s.meta.launchMult * synergy * s.policyFx.launchMult * riskMult(s, 'launch')
 }
 
 /**
@@ -282,8 +283,9 @@ function advanceTarget(s: GameState, cfg: Config, overkill: number, mult: number
     pushLog(s, 'boss', fill(t.log.bossDown, { name: s.bossName }))
     s.clearedDepth += 1
     if (cfg.invasion.timerModel === 'runWide') {
-      s.timeLeft += cfg.invasion.runWideBonusPerDepth
+      s.timeLeft += Math.floor(cfg.invasion.runWideBonusPerDepth * s.risk.depthBonusMult)
     }
+    s.risk.queue.push('boss')
     s.depth += 1
     beginDepth(s, cfg)
     pushLog(s, 'depth', fill(t.log.depth, { depth: s.depth, zone: depthNames(s.depth).zone }))
@@ -330,10 +332,12 @@ export function tick(s: GameState, input: TickInput, cfg: Config): void {
   if (born > 0) {
     s.culture -= born * sharkCost
     s.producedTotal += born
+    // 遺伝子の暴走: 失敗作は培養液を食うが在庫にも出生記録にも入らない
+    const alive = born * (1 - s.risk.failRate)
     for (const [mask, p] of s.birthDist) {
-      addSharks(s.inv, mask, born * p)
+      addSharks(s.inv, mask, alive * p)
       const before = s.births.get(mask) ?? 0
-      const after = before + born * p
+      const after = before + alive * p
       s.births.set(mask, after)
       // 1 体目が生まれた瞬間だけ、珍しい個体を記録に残す
       if (before < 1 && after >= 1) {
@@ -364,12 +368,20 @@ export function tick(s: GameState, input: TickInput, cfg: Config): void {
 
   // --- ドラフト ---
   // 提示だけ行い、選択されるまで進行を止める（選択は applyDraft が行う）。
-  // 両方が同時に条件を満たしたときは変異を先に出し、方針は次のティックまで待つ。
+  // 複数が同時に条件を満たしたときは 変異 → リスクカード → 方針 の順に、1 ティックに 1 つだけ出す。
   if (s.producedTotal >= s.nextDraftAt) {
     const roll = rollOffers(s, cfg)
     if (roll.offers.length === 0 && roll.derived.length === 0) s.nextDraftAt = Infinity
     else {
       s.pendingDraft = { kind: 'mutation', ...roll }
+      return
+    }
+  }
+  while (s.risk.queue.length > 0) {
+    const reason = s.risk.queue.shift()!
+    const offers = rollRisks(s, cfg)
+    if (offers.length > 0) {
+      s.pendingDraft = { kind: 'risk', offers, reason }
       return
     }
   }
@@ -399,7 +411,8 @@ export function tick(s: GameState, input: TickInput, cfg: Config): void {
   s.launchedPerSec += (launched / dt - s.launchedPerSec) * LAUNCH_SMOOTH
   // 検体の再利用: 投入した個体の一部が在庫へ戻る
   if (s.policyFx.recycle > 0 && launched > 0) addSharks(s.inv, 0, launched * s.policyFx.recycle)
-  applyDamage(s, cfg, damage)
+  applyDamage(s, cfg, damage * riskMult(s, 'power'))
+  if (s.risk.timers.length > 0) s.risk.timers = s.risk.timers.filter((x) => x.until > s.t)
 
   // --- タイマー ---
   s.timeLeft -= dt
@@ -409,6 +422,7 @@ export function tick(s: GameState, input: TickInput, cfg: Config): void {
       s.reserveUsed = true
       s.timeLeft += s.meta.reserveSeconds
       pushLog(s, 'system', fill(t.log.reserve, { sec: s.meta.reserveSeconds }))
+      s.risk.queue.push('reserve')
     } else {
       if (s.meta.lastStand) {
         pushLog(s, 'system', t.log.lastStand)
@@ -446,10 +460,10 @@ function finalVolley(s: GameState, cfg: Config): void {
   const all = totalSharks(s.inv)
   if (all <= 0) return
   const { damage } = launchWeakest(s.inv, all, s.slots, s.ranks, cfg, s.powerCache)
-  applyDamage(s, cfg, damage)
+  applyDamage(s, cfg, damage * riskMult(s, 'power'))
 }
 
-/** 提示中のドラフトを引き直す。1 ラン に使える回数は恒久強化で決まる */
+/** 提示中のドラフトを引き直す。1 ラン に使える回数は恒久強化で決まり、リスクカードと共有する */
 export function rerollDraft(s: GameState, cfg: Config): boolean {
   const d = s.pendingDraft
   if (!d || s.rerollsLeft <= 0) return false
@@ -457,7 +471,18 @@ export function rerollDraft(s: GameState, cfg: Config): boolean {
   s.pendingDraft =
     d.kind === 'mutation'
       ? { kind: 'mutation', ...rollOffers(s, cfg, d.derived) }
-      : { kind: 'policy', offers: rollPolicies(s, cfg) }
+      : d.kind === 'risk'
+        ? { kind: 'risk', offers: rollRisks(s, cfg), reason: d.reason }
+        : { kind: 'policy', offers: rollPolicies(s, cfg) }
+  return true
+}
+
+/** 提示中のリスクカードを見送る。見送りは回数制で、尽きたらどちらかを必ず選ぶ */
+export function skipRisk(s: GameState): boolean {
+  if (s.pendingDraft?.kind !== 'risk' || s.risk.skipsLeft <= 0) return false
+  s.risk.skipsLeft -= 1
+  pushLog(s, 'risk', t.log.riskSkip)
+  s.pendingDraft = null
   return true
 }
 
@@ -497,6 +522,8 @@ export function applyDraft(s: GameState, cfg: Config, index: number): void {
       chosen,
     ])
     finishMutationDraft(s, cfg)
+  } else if (d.kind === 'risk') {
+    applyRisk(s, cfg, d.offers[i])
   } else {
     const chosen = d.offers[i]
     s.policies.set(chosen.id, (s.policies.get(chosen.id) ?? 0) + 1)

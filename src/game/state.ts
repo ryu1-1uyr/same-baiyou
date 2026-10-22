@@ -3,6 +3,7 @@ import { BUILDINGS, BUILDING_INDEX } from './buildings.ts'
 import { type MetaEffects, metaEffects, createMeta } from './meta.ts'
 import type { DerivedDef, DerivedId } from './derived.ts'
 import type { Inventory } from './inventory.ts'
+import type { RiskDef, RiskId } from './risks.ts'
 import {
   type MutationDef,
   type MutationId,
@@ -25,11 +26,41 @@ import {
 
 export type Phase = 'culture' | 'invasion' | 'over'
 
+/** リスクカードが出た場面 */
+export type RiskReason = 'boss' | 'reserve'
+
 /** 突然変異のドラフトには、条件を満たした派生種のカードが並ぶことがある */
 export type PendingDraft =
-  { kind: 'mutation'; offers: MutationDef[]; derived: DerivedDef[] } | { kind: 'policy'; offers: PolicyDef[] }
+  | { kind: 'mutation'; offers: MutationDef[]; derived: DerivedDef[] }
+  | { kind: 'policy'; offers: PolicyDef[] }
+  | { kind: 'risk'; offers: RiskDef[]; reason: RiskReason }
 
-export type LogKind = 'hit' | 'boss' | 'depth' | 'draft' | 'policy' | 'system' | 'birth' | 'record'
+/** リスクカードの時間限定の効果。ゲーム内秒の [from, until) の間だけ効く */
+export type RiskTimer = { kind: 'power' | 'launch' | 'sharkRate'; mult: number; from: number; until: number }
+
+/** リスクカードの状態と、ラン終了まで続く効果 */
+export type RiskState = {
+  /** 提示待ち。ボス撃破と予備電源の発動で積み、ドラフトの後に 1 枚ずつ出す */
+  queue: RiskReason[]
+  /** このランで選んだカード。同じカードは二度と出ない */
+  taken: Set<RiskId>
+  skipsLeft: number
+  timers: RiskTimer[]
+  /** 全検体の戦闘力 */
+  powerMult: number
+  /** 全変異の発現率 */
+  rateMult: number
+  /** 変異ごとの発現率 */
+  rateBoost: Map<MutationId, number>
+  /** 生まれた検体のうち、在庫に入らない割合 */
+  failRate: number
+  /** ラン終了時の研究予算 */
+  budgetMult: number
+  /** 深度突破時の制限時間の継ぎ足し */
+  depthBonusMult: number
+}
+
+export type LogKind = 'hit' | 'boss' | 'depth' | 'draft' | 'policy' | 'risk' | 'system' | 'birth' | 'record'
 /** mutations を持つ行は、その組み合わせのサメを添えて表示する */
 export type LogEntry = { t: number; kind: LogKind; text: string; mutations?: readonly SharkPart[] }
 
@@ -77,7 +108,7 @@ export type GameState = {
   draftCount: number
   /**
    * ドラフト提示中。null 以外の間はゲームが進行しない（プレイヤーの選択待ち）。
-   * 突然変異と研究方針が同時に条件を満たした場合、片方は次のティックまで待つ。
+   * 複数が同時に条件を満たした場合は 突然変異 → リスクカード → 研究方針 の順に 1 つずつ出す。
    */
   pendingDraft: PendingDraft | null
 
@@ -117,6 +148,7 @@ export type GameState = {
   reserveUsed: boolean
   /** 確定の提示を済ませた派生種。取らなかったものは以降、通常の抽選に混ざる */
   derivedOffered: Set<DerivedId>
+  risk: RiskState
 }
 
 export function createState(cfg: Config, seed: number, meta?: MetaEffects): GameState {
@@ -159,6 +191,18 @@ export function createState(cfg: Config, seed: number, meta?: MetaEffects): Game
     rerollsLeft: eff.rerolls,
     reserveUsed: false,
     derivedOffered: new Set(),
+    risk: {
+      queue: [],
+      taken: new Set(),
+      skipsLeft: eff.skips,
+      timers: [],
+      powerMult: 1,
+      rateMult: 1,
+      rateBoost: new Map(),
+      failRate: 0,
+      budgetMult: 1,
+      depthBonusMult: 1,
+    },
   }
 
   // 恒久強化ぶんの初期値を積む
@@ -173,7 +217,12 @@ export function createState(cfg: Config, seed: number, meta?: MetaEffects): Game
 }
 
 export function refreshBirthDist(s: GameState, cfg: Config): void {
-  s.birthDist = birthDistribution(s.slots, s.ranks, cfg)
+  s.birthDist = birthDistribution(
+    s.slots,
+    s.ranks,
+    cfg,
+    (id) => s.risk.rateMult * (s.risk.rateBoost.get(id) ?? 1),
+  )
   // 戦闘力はランクが動いたときだけ変わる。ここで捨てれば次から積み直される
   s.powerCache.clear()
 }

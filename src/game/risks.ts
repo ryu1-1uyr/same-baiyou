@@ -27,14 +27,16 @@ export type RiskDef = {
   apply: (s: GameState, cfg: Config) => void
 }
 
-const JAMMING = { time: 10, sec: 30, sharkRate: 0.5 }
-const FALSIFY = { time: 15, budget: 0.75 }
-const BORROW = { time: 20, bonusMult: 0.5 }
-const OVERDOSE = { sec: 20, up: 2, down: 0.5 }
-const OVERDRIVE = { sec: 15, launch: 3, lose: 0.3 }
-const CANNIBAL = { power: 1.3, lose: 0.3 }
-const UNAPPROVED = { rate: 0.8 }
-const RUNAWAY = { rate: 3, failMin: 0.1, failMax: 0.6 }
+// 見返りは、取るときの心理的な重さに釣り合うよう大きめに置く（当初案の 2 倍。倍率は上乗せ分を 2 倍）
+const JAMMING = { time: 20, sec: 30, sharkRate: 0.5 }
+const FALSIFY = { time: 30, budget: 0.75 }
+const BORROW = { time: 40, bonusMult: 0.5 }
+const OVERDOSE = { sec: 20, up: 3, down: 0.5 }
+const OVERDRIVE = { sec: 15, launch: 5, lose: 0.3 }
+const CANNIBAL = { power: 1.6, lose: 0.3 }
+const FORBIDDEN = { gain: 2 }
+const UNAPPROVED = { rate: 0.8, count: 2 }
+const RUNAWAY = { rate: 5, failMin: 0.1, failMax: 0.6 }
 
 function owned(s: GameState, id: BuildingId): number {
   const i = BUILDING_INDEX.get(id)
@@ -139,7 +141,7 @@ export const RISKS: RiskDef[] = [
   {
     id: 'forbidden',
     cost: t.risk.forbidden.cost,
-    gain: t.risk.forbidden.gain,
+    gain: fill(t.risk.forbidden.gain, { n: FORBIDDEN.gain }),
     // 上げる側と下げる側で別の変異が要る。上げる側はランク上限未満に限る
     available: (s) => s.ranks.size >= 2 && ownedMutations(s).some((m) => s.ranks.get(m.id)! < s.meta.maxRank),
     apply: (s, cfg) => {
@@ -151,7 +153,7 @@ export const RISKS: RiskDef[] = [
         s,
         ownedMutations(s).filter((m) => m.id !== gained.id),
       )
-      const gainedRank = s.ranks.get(gained.id)! + 1
+      const gainedRank = Math.min(s.meta.maxRank, s.ranks.get(gained.id)! + FORBIDDEN.gain)
       const lostRank = s.ranks.get(lost.id)! - 1
       s.ranks.set(gained.id, gainedRank)
       // ランク 0 は「持っていない」と同じ。派生種の材料なら、以降は派生種が生まれなくなる
@@ -165,15 +167,20 @@ export const RISKS: RiskDef[] = [
   {
     id: 'unapproved',
     cost: fill(t.risk.unapproved.cost, { mult: UNAPPROVED.rate }),
-    gain: t.risk.unapproved.gain,
+    gain: fill(t.risk.unapproved.gain, { n: UNAPPROVED.count }),
     available: (s) => unownedRares(s).length > 0,
     apply: (s, cfg) => {
-      const m = pick(s, unownedRares(s))
-      assignSlot(s.slots, m)
-      s.ranks.set(m.id, 1)
+      // 候補が足りなければ取れるぶんだけ取る
+      for (let i = 0; i < UNAPPROVED.count; i++) {
+        const pool = unownedRares(s)
+        if (pool.length === 0) break
+        const m = pick(s, pool)
+        assignSlot(s.slots, m)
+        s.ranks.set(m.id, 1)
+        pushLog(s, 'risk', fill(t.log.unapproved, { name: mutationName(m) }), [m])
+      }
       s.risk.rateMult *= UNAPPROVED.rate
       refreshBirthDist(s, cfg)
-      pushLog(s, 'risk', fill(t.log.unapproved, { name: mutationName(m) }), [m])
     },
   },
   {

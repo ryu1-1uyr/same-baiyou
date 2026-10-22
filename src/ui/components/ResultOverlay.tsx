@@ -1,9 +1,10 @@
 import { cachedPower, mutationsOfMask, nameOfMask, partsOfMask } from '../../game/mutations.ts'
 import { bossHp, depthName } from '../../game/targets.ts'
-import { getConfig, getLastAward, setScreen } from '../../store/gameStore.ts'
+import { getConfig, getLastAward, getTutorial, setScreen } from '../../store/gameStore.ts'
 import { fill, t } from '../../text/index.ts'
 import { fmt, mmss } from '../format.ts'
 import { useGame } from '../useGame.ts'
+import { ChiefGate } from './Chief.tsx'
 import { SharkIcon } from './SharkIcon.tsx'
 import { Sprite } from './Sprite.tsx'
 
@@ -11,6 +12,7 @@ export function ResultOverlay() {
   const s = useGame()
   const cfg = getConfig()
   if (s.phase !== 'over') return null
+  if (getTutorial().gate === 'result') return <ChiefGate step="result" />
 
   // 累計出生。在庫と違って減らないので、そのランで何を作ったかの記録になる
   /**

@@ -2062,3 +2062,105 @@
 .overlay:has(> .codex) {
   z-index: 20;
 }
+
+/* ---- チュートリアル（主任の通信）----
+ * 変異・研究方針・リスクカード・派生種のどれとも違う紫で、「また主任が何か言っている」と分かるようにする。 */
+.chief {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.chief-speaker {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  color: var(--c-chief);
+}
+.chief-line {
+  margin: 0;
+  line-height: 1.7;
+}
+.chief-line strong {
+  color: var(--c-chief);
+}
+.modal[data-draft='chief'] {
+  max-width: 520px;
+  border-left: 3px solid var(--c-chief);
+}
+.modal[data-draft='chief'] .btn {
+  align-self: flex-end;
+}
+
+/* ゲームを止めない通知。ドラフトなどのオーバーレイ（z-index 10）より下に置く */
+.chief-notice {
+  position: fixed;
+  left: 50%;
+  bottom: var(--sp-4);
+  transform: translateX(-50%);
+  width: min(520px, calc(100vw - 2 * var(--sp-4)));
+  z-index: 9;
+  background: var(--c-panel);
+  border: 1px solid var(--c-line-hi);
+  border-left: 3px solid var(--c-chief);
+  border-radius: var(--r-2);
+  padding: var(--sp-3) calc(var(--sp-4) + 20px) var(--sp-3) var(--sp-4);
+  box-shadow: 0 6px 24px 0 color-mix(in srgb, var(--c-bg-deep) 80%, transparent);
+  font-size: var(--fs-sm);
+  animation: chief-in 260ms ease-out;
+}
+@keyframes chief-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+}
+.chief-close {
+  position: absolute;
+  top: var(--sp-1);
+  right: var(--sp-2);
+  background: transparent;
+  border: 0;
+  color: var(--c-text-dim);
+  font-size: var(--fs-md);
+  cursor: pointer;
+}
+.chief-close:hover {
+  color: var(--c-text);
+}
+
+/* 操作してほしい場所を光らせる。位置計算の要るツールチップは使わない（レイアウトが変わっても壊れない） */
+[data-tutorial-focus] {
+  outline: 2px solid var(--c-chief);
+  outline-offset: 2px;
+  animation: tutorial-pulse 1.2s ease-in-out infinite;
+}
+@keyframes tutorial-pulse {
+  50% {
+    outline-color: transparent;
+    box-shadow: 0 0 14px 0 color-mix(in srgb, var(--c-chief) 55%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-tutorial-focus],
+  .chief-notice {
+    animation: none;
+  }
+}
+
+.log-row[data-kind='chief'] {
+  border-left-color: var(--c-chief);
+}
+.log-row[data-kind='chief'] .log-text {
+  color: var(--c-chief);
+}
+
+/* 最初のあいさつのあと、培養液のボタンだけを押せる状態にする暗幕。光らせた対象だけを上に浮かせる */
+.tutorial-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--c-bg-deep) 78%, transparent);
+}
+body:has(.tutorial-lock) [data-tutorial-focus] {
+  position: relative;
+  z-index: 11;
+}

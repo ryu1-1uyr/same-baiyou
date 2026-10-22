@@ -345,4 +345,24 @@
     font-size: 8px;
     opacity: 0.28;
   }
+
+  /*
+   * 主任の通知は下の真ん中に置くと設備欄に被り、「設備を買え」で光らせた設備を自分で隠してしまう。
+   * 右下（在庫の欄の上）に寄せる
+   */
+  .chief-notice {
+    left: auto;
+    right: max(var(--sp-2), env(safe-area-inset-right));
+    bottom: var(--sp-2);
+    transform: none;
+    width: min(360px, 46vw);
+    padding: var(--sp-2) calc(var(--sp-3) + 16px) var(--sp-2) var(--sp-3);
+    font-size: var(--fs-xs);
+  }
+  @keyframes chief-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
 }

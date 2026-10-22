@@ -38,6 +38,15 @@ export function TitleScreen() {
         >
           {t.title.start}
         </button>
+        <button
+          className="title-item"
+          onClick={() => {
+            playSe('choose')
+            startNewRun({ tutorial: true })
+          }}
+        >
+          {t.title.tutorial}
+        </button>
         <button className="title-item" onClick={() => setDialog('help')}>
           {t.title.help}
         </button>

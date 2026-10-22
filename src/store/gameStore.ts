@@ -317,7 +317,7 @@ function recordCodex(): void {
   let changed = false
   for (const id of state.ranks.keys()) if (discover(meta, id)) changed = true
   for (const def of state.slots.fused) if (discover(meta, def.id)) changed = true
-  for (const m of revealHints(meta, state.ranks, state.meta.derivedTier)) {
+  for (const m of revealHints(meta, state.ranks, state.meta.families)) {
     pushLog(state, 'system', fill(t.log.hint, { material: mutationName(m), rank: RECIPE_RANK }))
     changed = true
   }

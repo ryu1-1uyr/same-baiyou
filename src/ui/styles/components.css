@@ -2050,9 +2050,6 @@
   font-size: var(--fs-xs);
   color: var(--c-text-dim);
 }
-.codex-entry[data-locked='true'] {
-  opacity: 0.55;
-}
 .codex-entry[data-found='false'][data-derived='true'] {
   grid-template-areas:
     'icon name'

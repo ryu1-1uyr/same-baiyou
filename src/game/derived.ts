@@ -1,6 +1,7 @@
 import type { Text } from '../text/index.ts'
 import { t } from '../text/index.ts'
 import {
+  type Family,
   MUTATION_BY_ID,
   type MutationDef,
   type MutationId,
@@ -20,7 +21,10 @@ import {
 
 export type DerivedId = keyof Text['derived']
 
-/** 解禁の段。スキルツリーの災害系の下に 3 段で繋がる */
+/**
+ * 難しさの段。1 は生体系だけ、2 は系統をまたぐ、3 はレジェンダリーを含む。
+ * 図鑑の研究予算の額に使う。作れるかどうかは段ではなく材料の系統で決まる（recipeOpen）
+ */
 export type DerivedTier = 1 | 2 | 3
 
 export type DerivedDef = {
@@ -87,6 +91,14 @@ export function derivedName(def: DerivedDef): string {
 
 export function materialsOf(def: DerivedDef): [MutationDef, MutationDef] {
   return [MUTATION_BY_ID.get(def.materials[0])!, MUTATION_BY_ID.get(def.materials[1])!]
+}
+
+/**
+ * そのレシピを作れるか。材料 2 種の系統がどちらも解禁済みなら作れる。
+ * 生体系だけのレシピは最初から作れ、系統を解禁するたびに作れる派生種が増えていく
+ */
+export function recipeOpen(def: DerivedDef, families: ReadonlySet<Family>): boolean {
+  return def.materials.every((id) => families.has(MUTATION_BY_ID.get(id)!.family))
 }
 
 /** 材料 2 種がともに条件のランクに届いているか */

@@ -6,6 +6,7 @@ import {
   derivedName,
   derivedOfferWeight,
   RECIPE_OF,
+  recipeOpen,
   recipeReady,
 } from './derived.ts'
 import { addSharks, launchWeakest, totalSharks } from './inventory.ts'
@@ -161,7 +162,7 @@ function draftWeight(s: GameState, cfg: Config, m: MutationDef): number {
   const recipe = RECIPE_OF.get(m.id)
   if (
     recipe &&
-    recipe.tier <= s.meta.derivedTier &&
+    recipeOpen(recipe, s.meta.families) &&
     !s.slots.fused.includes(recipe) &&
     recipe.materials.some((id) => (s.ranks.get(id) ?? 0) > 0)
   ) {
@@ -190,7 +191,7 @@ function rollOffers(
   )
   const derived: DerivedDef[] = [...keep]
   const ready = DERIVED.filter(
-    (d) => d.tier <= s.meta.derivedTier && !s.slots.fused.includes(d) && recipeReady(d, s.ranks),
+    (d) => recipeOpen(d, s.meta.families) && !s.slots.fused.includes(d) && recipeReady(d, s.ranks),
   )
   for (const d of ready) {
     if (s.derivedOffered.has(d.id) || derived.includes(d)) continue

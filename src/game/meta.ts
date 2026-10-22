@@ -335,9 +335,6 @@ export const UNLOCKS: UnlockDef[] = [
     requires: 'autoBuyOne',
   },
   // 派生種の解禁。系統をすべて解禁した先に置く。コストは試遊前の仮の値
-  { id: 'derived_1', cost: 60000, kind: 'unique', requires: 'family_disaster' },
-  { id: 'derived_2', cost: 200000, kind: 'unique', requires: 'derived_1' },
-  { id: 'derived_3', cost: 800000, kind: 'unique', requires: 'derived_2' },
 ]
 
 export const UNLOCK_BY_ID = new Map<string, UnlockDef>(UNLOCKS.map((u) => [u.id, u]))
@@ -395,8 +392,6 @@ export type MetaEffects = {
   lastStand: boolean
   /** リスクカードを出すか（解禁済みかつ研究所でオン） */
   riskMode: boolean
-  /** 作れる派生種の段。0 なら派生種は出ない */
-  derivedTier: 0 | 1 | 2 | 3
 }
 
 export function metaEffects(m: MetaState): MetaEffects {
@@ -440,7 +435,6 @@ export function metaEffects(m: MetaState): MetaEffects {
     overkillMult: has('chainCollapse') ? 2 : 1,
     lastStand: has('lastStand'),
     riskMode: has('riskMode') && m.riskEnabled,
-    derivedTier: has('derived_3') ? 3 : has('derived_2') ? 2 : has('derived_1') ? 1 : 0,
   }
 }
 
@@ -571,9 +565,6 @@ export const TREE: TreeNode[] = [
   { id: 'family_mech', branch: 'fam', col: 5, row: 1, requires: ['family_abyss'], preview: 'mecha' },
   { id: 'family_cosmic', branch: 'fam', col: 5, row: 2, requires: ['family_mech'], preview: 'alien' },
   { id: 'family_disaster', branch: 'fam', col: 5, row: 3, requires: ['family_cosmic'], preview: 'tornado' },
-  { id: 'derived_1', branch: 'fam', col: 5, row: 4, requires: ['family_disaster'] },
-  { id: 'derived_2', branch: 'fam', col: 5, row: 5, requires: ['derived_1'] },
-  { id: 'derived_3', branch: 'fam', col: 5, row: 6, requires: ['derived_2'] },
 
   // 運用 — 周回の速度
   { id: 'speed2', branch: 'ops', col: 6, row: 0, requires: [] },

@@ -1,4 +1,5 @@
-import type { MutationDef, MutationId, SharkPart } from '../game/mutations.ts'
+import { DERIVED, type DerivedId } from '../game/derived.ts'
+import type { MutationId, SharkPart } from '../game/mutations.ts'
 import { asset, drawLayer, onAssetLoaded } from './assets.ts'
 import { isDerived, MUTATIONS } from '../game/mutations.ts'
 import {
@@ -42,15 +43,25 @@ type Ctx = CanvasRenderingContext2D
 
 export type PartSlot = 'head' | 'tail' | 'body'
 
+type Tint = { rgb: RGB; amount: number; weight?: number }
+
 export type Visual = {
-  part?: { slot: PartSlot; draw: (ctx: Ctx) => void }
+  /** clear は尾の置換で base.png を消す幅（本体の左端から）。省略時は尾びれだけ */
+  part?: { slot: PartSlot; draw: (ctx: Ctx) => void; clear?: number }
   attach?: (ctx: Ctx) => void
   transform?: { scale?: number; count?: number; tilt?: number; alpha?: number }
-  palette?: { rgb: RGB; amount: number }
+  /** 複数渡すと体を等分して塗り分ける（尻尾側から順に） */
+  palette?: Tint | readonly Tint[]
   overlay?: (ctx: Ctx) => void
 }
 
 const RARITY_PRIORITY = { common: 1, uncommon: 2, rare: 3, legendary: 4 } as const
+
+/** 触手化で下半身を置き換える範囲（本体の左端から）。第二背びれの後ろまで */
+const TENTACLE_CUT = 36
+
+/** 部位を取り合ったとき、派生種はどの変異にも勝つ */
+const DERIVED_PRIORITY = 5
 
 /**
  * base.png の頭の部分を切り出して、ずらした位置に貼る。
@@ -118,7 +129,8 @@ const VISUALS: Partial<Record<MutationId, Visual>> = {
   },
   swift: {
     transform: { scale: 0.92 },
-    palette: { rgb: [150, 200, 230], amount: 0.25 },
+    // 灰色の体に薄く寄せても違いが見えなかったので、青をはっきり乗せる
+    palette: { rgb: [60, 145, 235], amount: 0.5 },
   },
   albino: {
     palette: { rgb: [244, 240, 236], amount: 0.72 },
@@ -234,18 +246,28 @@ const VISUALS: Partial<Record<MutationId, Visual>> = {
   tentacle: {
     part: {
       slot: 'tail',
+      // 下半身ごと置き換える。第二背びれ（x27〜33）まで消して、その切り口から触手を生やす
+      clear: TENTACLE_CUT,
       draw: (ctx) => {
-        // 尾びれを消した跡（x0〜12）に、付け根 (13, 22) からタコ足を生やす
-        for (let t = 0; t < 5; t++) {
-          const y0 = by(16 + t * 3)
-          const dir = t % 2 ? 1 : -1
-          for (let i = 0; i < 16; i++) {
-            const wob = Math.round(Math.sin(i * 0.5 + t * 1.3) * 3) * dir
-            const thick = i < 10 ? 3 : 2
-            px(ctx, bx(13 - i), y0 + wob + (i > 8 ? dir * 2 : 0), 1, thick, t % 2 ? '#8c5a86' : '#a06898')
+        const top = trunkTop(TENTACLE_CUT + 2)
+        const bottom = bodyBottom(TENTACLE_CUT + 2)
+        const n = 7
+        // 奥の触手から描く。上下に扇状に広がり、先へ行くほど細く、大きくうねる
+        for (const k of [0, 6, 1, 5, 2, 4, 3]) {
+          const y0 = top + 2 + ((bottom - top - 4) * (k + 0.5)) / n
+          const spread = (k - (n - 1) / 2) * 0.16
+          const len = 44 - Math.abs(k - 3) * 3
+          const light = k % 2 ? '#b47aa8' : '#9a5f92'
+          for (let s = -4; s < len; s++) {
+            const t = Math.max(0, s) / len
+            const y = y0 + spread * Math.max(0, s) + Math.sin(s * 0.2 + k * 1.1) * (1 + t * 5)
+            const thick = Math.max(1, Math.round(5 - t * 4))
+            const x = bx(TENTACLE_CUT - s)
+            px(ctx, x, y - thick / 2, 1, thick, light)
+            px(ctx, x, y + thick / 2, 1, 1, '#6e3f68')
+            // 下側の吸盤
+            if (s > 2 && s % 4 === 0 && thick >= 2) px(ctx, x, y + thick / 2 - 1, 1, 1, '#f0c8e6')
           }
-          // 先端の吸盤
-          px(ctx, bx(-2), y0 + Math.round(Math.sin(15 * 0.5 + t * 1.3) * 3) * dir + dir * 2, 1, 1, '#d9a9d0')
         }
       },
     },
@@ -388,6 +410,22 @@ const VISUALS: Partial<Record<MutationId, Visual>> = {
   },
   magma: {
     palette: { rgb: [220, 90, 30], amount: 0.55 },
+    overlay: (ctx) => {
+      // 背から立ち上る炎。根元は白く、先へ行くほど赤くする
+      for (let x = 8; x <= 88; x += 5) {
+        if (!inBody(x)) continue
+        const h = 5 + ((x * 7) % 6)
+        const t = trunkTop(x)
+        for (let i = 0; i < h; i++) {
+          const c = i < 2 ? '#fff3b0' : i < h * 0.6 ? '#ffb347' : '#e0542a'
+          const w = i < h * 0.5 ? 3 : i < h * 0.8 ? 2 : 1
+          px(ctx, bx(x) + Math.round(Math.sin(i * 0.9 + x) * 1), t - i, w, 1, c)
+        }
+      }
+      // 舞う火の粉
+      // prettier-ignore
+      for (const [x, y] of [[14, -2], [36, -6], [58, -9], [76, -4], [90, 2], [26, 2]] as const) px(ctx, bx(x), by(y), 1, 1, '#ffd24a')
+    },
   },
   frozen: {
     palette: { rgb: [190, 230, 255], amount: 0.5 },
@@ -426,6 +464,412 @@ const VISUALS: Partial<Record<MutationId, Visual>> = {
 }
 
 // ---------------------------------------------------------------------------
+// 派生種の見た目
+// ---------------------------------------------------------------------------
+
+/** 半透明で塗る。光・霧・ビームなど */
+function faint(ctx: Ctx, alpha: number, draw: () => void): void {
+  ctx.save()
+  ctx.globalAlpha = alpha
+  draw()
+  ctx.restore()
+}
+
+/** 体表の眼。邪神系で使い回す */
+function eye(ctx: Ctx, x: number, y: number, size = 4): void {
+  px(ctx, bx(x), by(y), size, size, '#ffe98a')
+  px(ctx, bx(x) + 1, by(y) + 1, size - 2, size - 2, '#1a0f24')
+}
+
+/**
+ * 派生種の見た目（暫定）。専用の絵ができるまで、変異と同じ仕組みで手続き的に描く。
+ *
+ * 色を保ちたい装飾は overlay に置く。attach は色の塗り分けより前に描かれるので、
+ * palette を持つ派生種では体と一緒に色が寄る。
+ * 画像を置けば変異と同じく差し替わる（ファイル名は派生種の id。public/sprites/README.md）。
+ */
+const DERIVED_VISUALS: Record<DerivedId, Visual> = {
+  // --- 1 段目 ---
+  missile: {
+    palette: { rgb: [205, 70, 55], amount: 0.3 },
+    attach: (ctx) => {
+      // 尾の安定翼。尾びれの付け根の背と腹に生やす
+      for (let x = 14; x <= 20; x++) {
+        const h = 21 - x
+        px(ctx, bx(x), trunkTop(x) - h, 1, h, PALETTE.metal)
+        px(ctx, bx(x), bodyBottom(x) + 1, 1, h, PALETTE.metal)
+      }
+    },
+    overlay: (ctx) => {
+      // 鼻先の弾頭。口 (y25) の少し上を中心に細らせる
+      for (let i = 0; i < 9; i++) {
+        const h = 9 - i
+        px(ctx, bx(89 + i), by(22) - h / 2, 1, h, i < 6 ? '#d8402e' : '#f2f2f2')
+      }
+      // 胴を一周する警告帯（黄と黒）
+      for (let x = 34; x <= 39; x++) {
+        if (!inBody(x)) continue
+        for (let y = trunkTop(x); y <= bodyBottom(x); y++) {
+          px(ctx, bx(x), y, 1, 1, Math.floor((y + x) / 3) % 2 ? '#1c1c1c' : '#f2c230')
+        }
+      }
+      // 噴射炎
+      for (let i = 0; i < 14; i++) {
+        const sz = i < 4 ? 6 : i < 9 ? 4 : 2
+        const c = i < 3 ? '#ffffff' : i < 7 ? '#9fe8ff' : '#ff9a3c'
+        px(ctx, bx(1 - i * 1.3), by(22) - sz / 2 + Math.round(Math.sin(i) * 1), sz, sz, c)
+      }
+    },
+  },
+  urchin: {
+    palette: { rgb: [80, 45, 105], amount: 0.5 },
+    overlay: (ctx) => {
+      // 全身から生えた毒の棘。背と腹の両方へ、長さを互い違いにする
+      for (let x = 14; x <= 90; x += 4) {
+        if (!inBody(x)) continue
+        const len = x % 8 ? 6 : 9
+        const t = trunkTop(x)
+        const b = bodyBottom(x)
+        px(ctx, bx(x), t - len, 1, len, '#8a63a8')
+        px(ctx, bx(x), t - len - 1, 1, 1, '#c8ff7a')
+        px(ctx, bx(x) + 2, b + 1, 1, len - 2, '#8a63a8')
+        px(ctx, bx(x) + 2, b + len - 1, 1, 1, '#c8ff7a')
+      }
+      // 体表の毒腺
+      // prettier-ignore
+      for (const [x, y] of [[26, 20], [40, 26], [52, 18], [70, 24], [78, 18]] as const) px(ctx, bx(x), by(y), 2, 2, '#c8ff7a')
+    },
+  },
+  fiveHead: {
+    part: {
+      slot: 'head',
+      draw: (ctx) => {
+        // 外側から順に貼り、最後に元の位置へ貼り直して真ん中の頭を一番手前に出す
+        stampHead(ctx, -2, -20)
+        stampHead(ctx, -2, 20)
+        stampHead(ctx, 2, -10)
+        stampHead(ctx, 2, 10)
+        stampHead(ctx, 0, 0)
+      },
+    },
+  },
+  matango: {
+    palette: { rgb: [140, 135, 100], amount: 0.45 },
+    attach: (ctx) => {
+      // 胴に開いた穴と、垂れた眼
+      // prettier-ignore
+      for (const [x, y, w] of [[30, 20, 6], [66, 22, 5]] as const) {
+        px(ctx, bx(x), by(y), w, 4, '#2a2f22')
+        for (let i = 0; i < w; i += 2) px(ctx, bx(x) + i, by(y) + 1, 1, 2, '#ddd6c0')
+      }
+      px(ctx, bx(81), by(23), 2, 3, '#e8ff7a')
+    },
+    overlay: (ctx) => {
+      // 背中を覆うキノコ。頭には一番大きな傘を載せる
+      // prettier-ignore
+      for (const [x, h, cap] of [[20, 4, 6], [28, 7, 9], [38, 5, 7], [44, 9, 11], [70, 6, 8], [84, 8, 13]] as const) {
+        if (!inBody(x)) continue
+        const t = trunkTop(x)
+        const cx = bx(x)
+        px(ctx, cx, t - h, 2, h, '#efe4cf')
+        px(ctx, cx - Math.floor(cap / 2) + 1, t - h - 3, cap, 3, '#c2493f')
+        px(ctx, cx - Math.floor(cap / 2) + 2, t - h - 4, cap - 2, 1, '#e26a5f')
+        px(ctx, cx - 1, t - h - 2, 1, 1, '#f9e0dc')
+        px(ctx, cx + 2, t - h - 3, 1, 1, '#f9e0dc')
+      }
+      // 舞う胞子
+      for (let i = 0; i < 14; i++) {
+        px(ctx, bx(10 + ((i * 23) % 86)), by(-10 + ((i * 7) % 12)), 1, 1, '#e9e2a8')
+      }
+    },
+  },
+  phantom: {
+    palette: { rgb: [210, 245, 255], amount: 0.8 },
+    transform: { alpha: 0.7 },
+    overlay: (ctx) => {
+      outline(ctx, FRAME_W, FRAME_H, [150, 240, 255], 0.9)
+      // 尾から後ろへ流れる霊気
+      for (let r = 0; r < 8; r++) {
+        const y = by(10 + r * 3.4)
+        const len = 12 + ((r * 7) % 12)
+        faint(ctx, 0.75 - (r % 3) * 0.15, () => px(ctx, bx(4) - len, y, len, 1, '#bff6ff'))
+      }
+      // 空洞の光る眼
+      px(ctx, bx(80), by(21), 4, 3, '#bff6ff')
+      px(ctx, bx(81), by(22), 2, 1, '#ffffff')
+    },
+  },
+
+  // --- 2 段目 ---
+  sharkTornado: {
+    palette: { rgb: [150, 165, 180], amount: 0.25 },
+    transform: { count: 3, tilt: 0.45 },
+    overlay: (ctx) => {
+      // 上に広がる漏斗状の渦
+      for (let i = 0; i < 10; i++) {
+        const y = by(46 - i * 5.6)
+        const w = 14 + i * 9
+        px(ctx, bx(48) - w / 2, y, w, 1, i % 2 ? '#c4dfee' : '#7fa8c4')
+      }
+      // 巻き上げられた瓦礫
+      // prettier-ignore
+      for (const [x, y] of [[4, 2], [90, 6], [14, 34], [84, 30], [50, -6]] as const) px(ctx, bx(x), by(y), 2, 2, '#6b5d4f')
+    },
+  },
+  lantern: {
+    palette: { rgb: [28, 22, 58], amount: 0.62 },
+    overlay: (ctx) => {
+      outline(ctx, FRAME_W, FRAME_H, [100, 80, 210], 0.35)
+      // 額から伸びる誘引突起。上へ立ててから口の前へ垂らす
+      const t = trunkTop(84)
+      px(ctx, bx(84), t - 8, 1, 8, '#6b5a8a')
+      px(ctx, bx(84), t - 9, 14, 1, '#6b5a8a')
+      px(ctx, bx(98), t - 9, 1, 6, '#6b5a8a')
+      // 発光体と光の輪
+      faint(ctx, 0.35, () => px(ctx, bx(95), t - 6, 8, 8, '#ffd84a'))
+      px(ctx, bx(97), t - 4, 4, 4, '#fff3a0')
+      px(ctx, bx(98), t - 3, 1, 1, '#ffffff')
+      // 体側に並ぶ発光器
+      for (let x = 22; x <= 76; x += 8) px(ctx, bx(x), by(27), 2, 1, '#7fe8ff')
+      // 光る眼
+      px(ctx, bx(81), by(22), 2, 2, '#7fe8ff')
+    },
+  },
+  railgun: {
+    palette: { rgb: [140, 150, 165], amount: 0.6 },
+    attach: (ctx) => {
+      // 体のシルエットの上にだけ装甲パネルを貼る（ひれの形はそのまま残る）
+      ctx.save()
+      ctx.globalCompositeOperation = 'source-atop'
+      px(ctx, bx(0), by(0), BODY_W, BODY_H, PALETTE.metal)
+      for (let x = 6; x < BODY_W; x += 10) px(ctx, bx(x), by(0), 1, BODY_H, PALETTE.metalDark)
+      px(ctx, bx(0), by(22), BODY_W, 1, PALETTE.metalDark)
+      for (let x = 10; x < BODY_W; x += 10) {
+        px(ctx, bx(x), by(16), 1, 1, '#c9d1d8')
+        px(ctx, bx(x), by(28), 1, 1, '#c9d1d8')
+      }
+      // 背の明るい縁と、顎の装甲
+      for (let x = 4; x < BODY_W; x++) if (inBody(x)) px(ctx, bx(x), bodyTop(x), 1, 1, '#c9d1d8')
+      px(ctx, bx(84), by(25), 12, 3, PALETTE.metalDark)
+      ctx.restore()
+    },
+    overlay: (ctx) => {
+      // 赤いバイザーの目
+      px(ctx, bx(77), by(20), 8, 3, '#2a1010')
+      px(ctx, bx(78), by(21), 6, 1, '#ff3b2f')
+      // 背のエネルギーセルと、胴の排気口
+      for (const x of [20, 32, 70]) {
+        const t = trunkTop(x)
+        px(ctx, bx(x), t - 4, 6, 4, PALETTE.metalDark)
+        px(ctx, bx(x) + 1, t - 3, 4, 2, '#8ff0ff')
+      }
+      for (const x of [40, 44, 48]) px(ctx, bx(x), by(30), 2, 3, '#2b2f33')
+      // 背と腹に沿う 2 本のレール。支柱で体に固定する
+      const top = by(-3)
+      const bottom = by(45)
+      for (const y of [top, bottom]) {
+        px(ctx, bx(18), y, 88, 2, PALETTE.metal)
+        px(ctx, bx(18), y + 2, 88, 1, PALETTE.metalDark)
+      }
+      for (const x of [26, 40, 72]) {
+        px(ctx, bx(x), top + 2, 1, trunkTop(x) - top - 2, PALETTE.metalDark)
+        px(ctx, bx(x), bodyBottom(x), 1, bottom - bodyBottom(x), PALETTE.metalDark)
+      }
+      // レールの間を走る放電
+      for (let i = 0; i < 9; i++) {
+        const x = bx(96 + (i % 2) * 3)
+        px(ctx, x, top + 3 + i * 5.2, 2, 3, i % 3 ? '#8ff0ff' : '#ffffff')
+      }
+      // 砲口の閃光
+      px(ctx, bx(106), by(19), 4, 6, '#8ff0ff')
+      px(ctx, bx(107), by(20), 2, 4, '#ffffff')
+    },
+  },
+  heatShock: {
+    // 尻尾側が溶岩、頭側が氷。塗り分けで体を半分ずつにする
+    palette: [
+      { rgb: [220, 90, 30], amount: 0.55 },
+      { rgb: [190, 230, 255], amount: 0.55 },
+    ],
+    overlay: (ctx) => {
+      // 後ろ半分に走る溶岩の亀裂
+      // prettier-ignore
+      for (const [x, y] of [[18, 20], [26, 24], [34, 19], [40, 26]] as const) {
+        for (let i = 0; i < 5; i++) px(ctx, bx(x + i), by(y + (i % 2 ? 1 : -1)), 1, 1, i % 2 ? '#ffd24a' : '#ff7a1c')
+      }
+      // 前半分を覆う氷塊
+      // prettier-ignore
+      for (const [x, y, sz] of [[56, 16, 6], [66, 24, 7], [76, 17, 5], [84, 25, 4]] as const) {
+        px(ctx, bx(x), by(y), sz, sz, '#dff2ff')
+        px(ctx, bx(x) + 1, by(y) + 1, 2, 2, '#ffffff')
+      }
+      // 境目から立つ蒸気
+      for (let i = 0; i < 8; i++) {
+        faint(ctx, 0.6, () => px(ctx, bx(44 + (i % 3) * 3), trunkTop(47) - 3 - i * 2, 3, 2, '#f0f0f0'))
+      }
+    },
+  },
+  soaring: {
+    palette: { rgb: [205, 225, 250], amount: 0.3 },
+    transform: { tilt: -0.22 },
+    overlay: (ctx) => {
+      // 背から後ろへ反った翼。奥の翼を暗く、手前を明るく 2 枚重ねる。
+      // 3 段ごとに後縁を伸ばして羽根の先に見せる
+      // 背びれの上（x48〜64）は trunkTop がひれの先を返すので、手前の背から高さを取る
+      const root = trunkTop(42) + 1
+      for (const [dx, h, light, dark] of [
+        [6, 12, '#c9d6e4', '#9aabbd'],
+        [0, 16, '#ffffff', '#c4d2e0'],
+      ] as const) {
+        for (let r = 0; r < h; r++) {
+          const left = bx(42 + dx - r * 1.2 - (r % 3 === 2 ? 4 : 0))
+          const right = bx(62 + dx - r * 0.4)
+          px(ctx, left, root - r, right - left, 1, r % 3 === 2 ? dark : light)
+        }
+      }
+      // 吹き付ける風
+      for (let i = 0; i < 6; i++) px(ctx, bx(-12 + (i % 3) * 6), by(4 + i * 6), 18, 1, '#dbe9f3')
+    },
+  },
+
+  // --- 3 段目 ---
+  megalodon: {
+    palette: { rgb: [95, 100, 112], amount: 0.42 },
+    transform: { scale: 1.6 },
+    attach: (ctx) => {
+      // 古傷
+      // prettier-ignore
+      for (const [x, y] of [[28, 18], [42, 22], [64, 17]] as const) {
+        for (let i = 0; i < 5; i++) px(ctx, bx(x + i), by(y + i), 1, 1, '#c9c2b0')
+      }
+    },
+    overlay: (ctx) => {
+      // 大きく開いた顎と、上下に並ぶ牙
+      px(ctx, bx(80), by(23), 16, 8, '#3a1414')
+      for (let i = 0; i < 7; i++) {
+        px(ctx, bx(81 + i * 2), by(23), 1, 3, '#ffffff')
+        px(ctx, bx(82 + i * 2), by(28), 1, 3, '#ffffff')
+      }
+      // 背の骨質の隆起
+      for (const x of BACK_XS) {
+        if (!inBody(x)) continue
+        px(ctx, bx(x) - 1, trunkTop(x) - 3, 4, 4, '#e6dcc0')
+      }
+      // 赤い眼
+      px(ctx, bx(80), by(20), 2, 2, '#ff3b2f')
+    },
+  },
+  fortress: {
+    palette: { rgb: [150, 158, 166], amount: 0.55 },
+    attach: (ctx) => {
+      // 背を隙間なく覆う装甲板
+      for (let x = 16; x <= 88; x++) {
+        if (!inBody(x) || onDorsal(x)) continue
+        const t = trunkTop(x)
+        px(ctx, bx(x), t, 1, 6, x % 8 === 0 ? PALETTE.metalDark : PALETTE.metal)
+      }
+    },
+    overlay: (ctx) => {
+      // 3 基の砲塔
+      for (const x of [24, 36, 72]) {
+        const t = trunkTop(x)
+        px(ctx, bx(x) - 3, t - 5, 8, 5, PALETTE.metal)
+        px(ctx, bx(x) - 3, t - 5, 8, 1, '#c9d1d8')
+        px(ctx, bx(x) + 5, t - 4, 7, 2, PALETTE.metalDark)
+        px(ctx, bx(x), t - 7, 2, 2, '#ff4d4d')
+      }
+      // 腹の履帯
+      for (let x = 18; x <= 80; x++) {
+        if (!inBody(x)) continue
+        const b = bodyBottom(x)
+        px(ctx, bx(x), b - 1, 1, 5, '#2b2f33')
+        if (x % 6 === 0) px(ctx, bx(x), b + 1, 2, 2, '#7a838c')
+      }
+    },
+  },
+  invader: {
+    palette: { rgb: [80, 230, 120], amount: 0.4 },
+    overlay: (ctx) => {
+      // 牽引ビーム
+      faint(ctx, 0.3, () => {
+        for (let r = 0; r < 24; r++) px(ctx, bx(40 - r * 0.8), by(30 + r), 16 + r * 1.6, 1, '#c8ff6a')
+      })
+      // 胴を貫く円盤。中心 (48, 24) の楕円
+      for (let x = -6; x <= 102; x++) {
+        const k = (x - 48) / 54
+        const h = Math.round(4 * Math.sqrt(Math.max(0, 1 - k * k)))
+        if (h <= 0) continue
+        px(ctx, bx(x), by(24) - h, 1, h * 2, PALETTE.metal)
+        px(ctx, bx(x), by(24) - h, 1, 1, '#d6dde3')
+      }
+      for (let i = 0; i < 12; i++) {
+        px(ctx, bx(2 + i * 8), by(24), 2, 1, ['#ff4d4d', '#ffe14d', '#4dd2ff'][i % 3])
+      }
+      // 頭の触角と単眼
+      const t = trunkTop(80)
+      px(ctx, bx(82), t - 9, 2, 9, '#c8ffd8')
+      px(ctx, bx(80), t - 13, 6, 5, '#e8ff6a')
+      px(ctx, bx(78), by(17), 7, 6, '#111820')
+      px(ctx, bx(80), by(19), 3, 3, '#c8ff6a')
+    },
+  },
+  megaquake: {
+    palette: { rgb: [50, 80, 130], amount: 0.5 },
+    transform: { scale: 1.4 },
+    overlay: (ctx) => {
+      // 背に立つ波頭
+      for (let x = 4; x <= 92; x += 2) {
+        if (!inBody(x)) continue
+        const y = trunkTop(x) - 4 - Math.round(Math.abs(Math.sin(x * 0.18)) * 4)
+        px(ctx, bx(x), y, 2, 2, x % 6 ? '#7fd4ff' : '#ffffff')
+      }
+      // 体を走る地割れ
+      // prettier-ignore
+      for (const [x, y] of [[24, 18], [44, 22], [66, 19]] as const) {
+        for (let i = 0; i < 8; i++) px(ctx, bx(x + i), by(y + (i % 3) - 1), 1, 1, i % 2 ? '#1a2638' : '#ffb347')
+      }
+      // 前後に広がる衝撃波
+      for (const [x0, dir] of [
+        [-4, -1],
+        [100, 1],
+      ] as const) {
+        for (let k = 0; k < 3; k++) {
+          for (let y = 10 + k * 2; y <= 34 - k * 2; y++) px(ctx, bx(x0 + dir * k * 4), by(y), 1, 1, '#dbe9f3')
+        }
+      }
+    },
+  },
+  starSpawn: {
+    palette: { rgb: [40, 20, 70], amount: 0.62 },
+    overlay: (ctx) => {
+      outline(ctx, FRAME_W, FRAME_H, [170, 110, 255], 0.45)
+      // 体表の星空
+      for (let i = 0; i < 36; i++) {
+        const x = 16 + ((i * 17) % 76)
+        if (!inBody(x)) continue
+        const t = bodyTop(x)
+        const b = bodyBottom(x)
+        px(ctx, bx(x), t + 2 + ((i * 11) % Math.max(2, b - t - 4)), 1, 1, i % 4 ? '#ffffff' : '#9fd0ff')
+      }
+      // 増えた眼
+      // prettier-ignore
+      for (const [x, y] of [[30, 20], [42, 25], [68, 19], [74, 26]] as const) eye(ctx, x, y)
+      // 顎から垂れる触手
+      for (let k = 0; k < 4; k++) {
+        const len = 12 + (k % 2) * 6
+        for (let i = 0; i < len; i++) {
+          const x = bx(78 + k * 4) + Math.round(Math.sin(i * 0.5 + k * 1.7) * 2)
+          px(ctx, x, by(29 + i), i < len - 4 ? 2 : 1, 1, k % 2 ? '#9a6cc8' : '#b98ae0')
+        }
+      }
+      // 周囲に散る星
+      // prettier-ignore
+      for (const [x, y] of [[-8, -6], [20, -10], [60, -12], [100, -4], [-10, 40], [104, 38]] as const) px(ctx, bx(x), by(y), 1, 1, '#ffffff')
+    },
+  },
+}
+
+// ---------------------------------------------------------------------------
 // 合成
 // ---------------------------------------------------------------------------
 
@@ -442,14 +886,15 @@ function newCanvas(w: number, h: number): { c: HTMLCanvasElement; g: Ctx } {
  * ベースのサメ 1 体ぶん（部位の置換を反映して）を 1 枚に描く。
  *
  * base.png は尾びれまで含んだ完成形なので、画像があるときは仮の尾を描かない。
- * 尾を置換する変異（触手化）は、base の尾びれの領域を消してから描く。
+ * 尾を置換する変異（触手化）は最後に描く。消す範囲に載った胴の置換や追加部位
+ * （装甲板・棘など）ごと消してから描かないと、消えた下半身の上に浮いて残るため。
  */
 const TAIL_W = 13 // base.png の尾びれが占める幅（付け根の手前まで）
 
 function drawOne(
   g: Ctx,
-  parts: Map<PartSlot, { id: MutationId; part: NonNullable<Visual['part']> }>,
-  attaches: Array<{ id: MutationId; draw: (c: Ctx) => void }>,
+  parts: Map<PartSlot, { id: string; part: NonNullable<Visual['part']> }>,
+  attaches: Array<{ id: string; draw: (c: Ctx) => void }>,
 ): void {
   const tail = parts.get('tail')
   const body = parts.get('body')
@@ -460,10 +905,6 @@ function drawOne(
     // base.png だけは 96×44 なので、枠の中の本体位置に置く。
     // 他のレイヤーは枠と同じ 128×72 なので (0,0) でよい。
     g.drawImage(asset('base')!, BODY_X, BODY_Y)
-    if (tail) {
-      g.clearRect(BODY_X, BODY_Y, TAIL_W, BODY_H)
-      drawLayer(g, `part/tail/${tail.id}`, tail.part.draw)
-    }
   } else {
     // 画像が無いときだけ仮の絵を組む
     if (tail) tail.part.draw(g)
@@ -478,6 +919,12 @@ function drawOne(
   if (body) drawLayer(g, `part/body/${body.id}`, body.part.draw)
   if (head) drawLayer(g, `part/head/${head.id}`, head.part.draw)
   for (const a of attaches) drawLayer(g, `attach/${a.id}`, a.draw)
+
+  if (hasBase && tail) {
+    // 背の上に生えた装飾も消えるよう、枠の高さいっぱいに消す
+    g.clearRect(BODY_X, 0, tail.part.clear ?? TAIL_W, FRAME_H)
+    drawLayer(g, `part/tail/${tail.id}`, tail.part.draw)
+  }
 }
 
 const cache = new Map<string, HTMLCanvasElement>()
@@ -509,31 +956,36 @@ export function spriteKey(defs: readonly SharkPart[]): string {
   return key
 }
 
-const PLAIN: readonly MutationDef[] = []
+/** 合成に載せる 1 枚ぶん。id は画像のファイル名にもなる */
+type Layer = { id: string; visual: Visual; priority: number; derived: boolean }
 
 /**
- * 派生種の仮の見た目。専用の絵を描くまで、素のサメに工事中の縞を重ねる。
- * 派生種を含む個体はほかの変異の見た目を載せず、すべてこの絵にする。
+ * 組み合わせを、合成に載せる見た目の並びに読み替える。
+ *
+ * 派生種はほかの変異と混ぜて描く（名前が「発光ミサイルシャーク」なら光らせる）。
+ * ただし派生種の特色は必ず見えるようにする:
+ *  - 材料の変異は派生種に吸収されたものとして描かない
+ *  - 派生種は並びの最後に置く。部位・装飾・エフェクトが一番上に重なり、塗り分けでは頭側に来る
+ *  - 部位の取り合いでは派生種が必ず勝つ（DERIVED_PRIORITY）
+ *  - 塗り分けでは派生種の色が体の半分以上を取る（sharkSprite の weight）
+ * 変異同士の順番は定義順にそろえる（部位の取り合いや塗り分けの順が渡し方に左右されないように）。
  */
-function placeholderSprite(scale: number): HTMLCanvasElement {
-  const base = sharkSprite(PLAIN, scale)
-  const { c, g } = newCanvas(base.width, base.height)
-  g.drawImage(base, 0, 0)
-  // 縞はサメの不透明な部分にだけ乗せる
-  g.globalCompositeOperation = 'source-atop'
-  g.globalAlpha = 0.6
-  const stripe = 6 * scale
-  for (let x = -c.height; x < c.width + c.height; x += stripe * 2) {
-    g.fillStyle = '#f2c230'
-    g.beginPath()
-    g.moveTo(x, c.height)
-    g.lineTo(x + stripe, c.height)
-    g.lineTo(x + stripe + c.height, 0)
-    g.lineTo(x + c.height, 0)
-    g.closePath()
-    g.fill()
-  }
-  return c
+function layersOf(mutations: readonly SharkPart[]): Layer[] {
+  const derived = DERIVED.filter((d) => mutations.includes(d))
+  const absorbed = new Set<MutationId>(derived.flatMap((d) => d.materials))
+  const base = MUTATIONS.filter((m) => mutations.includes(m) && !absorbed.has(m.id)).flatMap((m) => {
+    const v = VISUALS[m.id]
+    return v ? [{ id: m.id as string, visual: v, priority: RARITY_PRIORITY[m.rarity], derived: false }] : []
+  })
+  return [
+    ...base,
+    ...derived.map((d) => ({
+      id: d.id,
+      visual: DERIVED_VISUALS[d.id],
+      priority: DERIVED_PRIORITY,
+      derived: true,
+    })),
+  ]
 }
 
 /**
@@ -545,40 +997,32 @@ export function sharkSprite(mutations: readonly SharkPart[], scale = 1): HTMLCan
   const hit = cache.get(key)
   if (hit) return hit
 
-  if (mutations.some(isDerived)) {
-    const out = placeholderSprite(scale)
-    remember(key, out)
-    return out
-  }
-
-  // 部位の取り合いや塗り分けの順が渡し方に左右されないよう、定義順にそろえる
-  const defs: MutationDef[] = MUTATIONS.filter((m) => mutations.includes(m))
-
   // --- チャンネルごとに集約 ---
-  const parts = new Map<PartSlot, { id: MutationId; part: NonNullable<Visual['part']> }>()
+  const parts = new Map<PartSlot, { id: string; part: NonNullable<Visual['part']> }>()
   const partPriority = new Map<PartSlot, number>()
-  const attaches: Array<{ id: MutationId; draw: (c: Ctx) => void }> = []
-  const palettes: Array<{ rgb: RGB; amount: number }> = []
-  const overlays: Array<{ id: MutationId; draw: (c: Ctx) => void }> = []
+  const attaches: Array<{ id: string; draw: (c: Ctx) => void }> = []
+  const palettes: Tint[] = []
+  const derivedPalettes: Tint[] = []
+  const overlays: Array<{ id: string; draw: (c: Ctx) => void }> = []
   let scaleMult = 1
   let count = 1
   let tilt = 0
   let alpha = 1
 
-  for (const d of defs) {
-    const v = VISUALS[d.id]
-    if (!v) continue
+  for (const { id, visual: v, priority, derived } of layersOf(mutations)) {
     if (v.part) {
       // 同じスロットを取り合ったらレア度が高い方が勝つ
-      const p = RARITY_PRIORITY[d.rarity]
-      if ((partPriority.get(v.part.slot) ?? -1) < p) {
-        parts.set(v.part.slot, { id: d.id, part: v.part })
-        partPriority.set(v.part.slot, p)
+      if ((partPriority.get(v.part.slot) ?? -1) < priority) {
+        parts.set(v.part.slot, { id, part: v.part })
+        partPriority.set(v.part.slot, priority)
       }
     }
-    if (v.attach) attaches.push({ id: d.id, draw: v.attach })
-    if (v.palette) palettes.push(v.palette)
-    if (v.overlay) overlays.push({ id: d.id, draw: v.overlay })
+    if (v.attach) attaches.push({ id, draw: v.attach })
+    if (v.palette) {
+      const tints = Array.isArray(v.palette) ? v.palette : [v.palette as Tint]
+      ;(derived ? derivedPalettes : palettes).push(...tints)
+    }
+    if (v.overlay) overlays.push({ id, draw: v.overlay })
     if (v.transform) {
       if (v.transform.scale) scaleMult *= v.transform.scale
       if (v.transform.count) count = Math.max(count, v.transform.count)
@@ -590,8 +1034,11 @@ export function sharkSprite(mutations: readonly SharkPart[], scale = 1): HTMLCan
   // --- 1 体ぶんを論理サイズで描く ---
   const { c: unit, g: ug } = newCanvas(FRAME_W, FRAME_H)
   drawOne(ug, parts, attaches)
-  // 色を変える変異が複数あるときは、混ぜずに体を等分して塗り分ける
-  tintBands(ug, FRAME_W, FRAME_H, palettes, BODY_X, BODY_X + BODY_W)
+  // 色を変える変異が複数あるときは、混ぜずに体を等分して塗り分ける。
+  // 派生種の色は頭側に置き、ほかの色が何色あっても合わせて体の半分以上を取る
+  const share = Math.max(1, palettes.length / Math.max(1, derivedPalettes.length))
+  const bands = [...palettes, ...derivedPalettes.map((p) => ({ ...p, weight: share }))]
+  tintBands(ug, FRAME_W, FRAME_H, bands, BODY_X, BODY_X + BODY_W)
   for (const o of overlays) drawLayer(ug, `overlay/${o.id}`, o.draw)
 
   // --- 変形を適用して最終キャンバスへ ---
@@ -636,6 +1083,16 @@ function remember(key: string, out: HTMLCanvasElement): void {
     if (oldest !== undefined) cache.delete(oldest)
   }
   cache.set(key, out)
+}
+
+/**
+ * 大きさの倍率（巨大化・メガロドンなど）。UI のアイコンはふつう高さを揃えて縮めるので、
+ * これを掛けないと巨大化しても同じ大きさに見える。
+ */
+export function sharkSize(mutations: readonly SharkPart[]): number {
+  let m = 1
+  for (const { visual } of layersOf(mutations)) m *= visual.transform?.scale ?? 1
+  return m
 }
 
 /** 在庫やリザルトなど、DOM に画像として置きたい場所向け */

@@ -3,6 +3,7 @@ import { MUTATION_BY_ID, type MutationDef, type MutationId } from '../../game/mu
 import { pixelIcon } from '../../render/icons.ts'
 import { sharkBounds, sharkSprite } from '../../render/sharkSprite.ts'
 import { useAssetVersion } from '../useAssetVersion.ts'
+import { growOf } from './SharkIcon.tsx'
 
 /**
  * UI 上のアイコン。すべてドット絵で描く。
@@ -56,5 +57,16 @@ export function Sprite({ kind, id, size = 22 }: { kind: SpriteKind; id: string; 
     g.drawImage(src, 0, 0, c.width, c.height)
   }, [kind, id, size, assetVersion])
 
-  return <canvas className="sprite" data-sprite={`${kind}:${id}`} ref={ref} aria-hidden="true" />
+  const def = kind === 'mutation' ? MUTATION_BY_ID.get(id as MutationId) : undefined
+  const grow = def ? growOf([def]) : 1
+  return (
+    <canvas
+      className="sprite"
+      data-sprite={`${kind}:${id}`}
+      ref={ref}
+      aria-hidden="true"
+      data-grow={grow !== 1 || undefined}
+      style={grow !== 1 ? { transform: `scale(${grow})` } : undefined}
+    />
+  )
 }

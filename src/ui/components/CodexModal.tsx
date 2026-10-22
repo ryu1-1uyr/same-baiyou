@@ -12,10 +12,9 @@ import {
 } from '../../game/mutations.ts'
 import { claimCodexReward, getMeta, setCodexOpen } from '../../store/gameStore.ts'
 import { fill, t } from '../../text/index.ts'
-import { fmt } from '../format.ts'
+import { fmt, RARITY_LABEL } from '../format.ts'
 import { useGame } from '../useGame.ts'
 import { Dialog } from './Dialog.tsx'
-import { RARITY_LABEL } from './DraftOverlay.tsx'
 import { SharkIcon } from './SharkIcon.tsx'
 
 const FAMILY_ORDER = Object.keys(FAMILIES) as Family[]

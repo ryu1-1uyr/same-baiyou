@@ -17,3 +17,11 @@ export function mmss(sec: number): string {
   const s = Math.max(0, sec)
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 }
+
+/** レア度の表示ラベル。ドラフトと図鑑で共有する */
+export const RARITY_LABEL: Record<string, string> = {
+  common: 'COMMON',
+  uncommon: 'UNCOMMON',
+  rare: 'RARE',
+  legendary: 'LEGENDARY',
+}

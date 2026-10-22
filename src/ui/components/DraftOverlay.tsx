@@ -5,18 +5,12 @@ import { riskCost, riskName } from '../../game/risks.ts'
 import { playSe } from '../../audio/se.ts'
 import { derivedName, materialsOf } from '../../game/derived.ts'
 import { chooseDerived, chooseDraft, getConfig, reroll, skip } from '../../store/gameStore.ts'
-import { fmt } from '../format.ts'
+import { fmt, RARITY_LABEL } from '../format.ts'
 import { fill, t } from '../../text/index.ts'
 import { useGame } from '../useGame.ts'
+import { CodexButton } from './CodexButton.tsx'
 import { SharkIcon } from './SharkIcon.tsx'
 import { Sprite } from './Sprite.tsx'
-
-export const RARITY_LABEL: Record<string, string> = {
-  common: 'COMMON',
-  uncommon: 'UNCOMMON',
-  rare: 'RARE',
-  legendary: 'LEGENDARY',
-}
 
 /**
  * ドラフト。突然変異（検体側）・研究方針（施設側）・リスクカード（侵略中の取引）の 3 種類が同じ枠に出る。
@@ -104,16 +98,27 @@ export function DraftOverlay() {
           </div>
         </div>
 
-        {s.rerollsLeft > 0 && (
-          <button
-            className="reroll"
-            onClick={() => {
-              playSe('buy')
-              reroll()
-            }}
-          >
-            {fill(t.draft.reroll, { n: s.rerollsLeft })}
-          </button>
+        {/* 空の行が余白になるので、どちらも出ないときは行ごと置かない */}
+        {(s.rerollsLeft > 0 || !isPolicy) && (
+          <div className="draft-actions">
+            {s.rerollsLeft > 0 && (
+              <button
+                className="reroll"
+                onClick={() => {
+                  playSe('buy')
+                  reroll()
+                }}
+              >
+                {fill(t.draft.reroll, { n: s.rerollsLeft })}
+              </button>
+            )}
+            {/*
+             * 変異の組み合わせを確かめてから選べるようにする。
+             * オーバーレイが HUD を覆うので、ドラフト中はここからしか図鑑を開けない。
+             * 提示中はティックが止まるため、眺めていても持ち時間は減らない。
+             */}
+            {!isPolicy && <CodexButton />}
+          </div>
         )}
 
         <div className="cards">

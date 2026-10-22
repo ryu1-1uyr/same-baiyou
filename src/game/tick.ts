@@ -285,7 +285,7 @@ function advanceTarget(s: GameState, cfg: Config, overkill: number, mult: number
     if (cfg.invasion.timerModel === 'runWide') {
       s.timeLeft += Math.floor(cfg.invasion.runWideBonusPerDepth * s.risk.depthBonusMult)
     }
-    s.risk.queue.push('boss')
+    if (s.meta.riskMode) s.risk.queue.push('boss')
     s.depth += 1
     beginDepth(s, cfg)
     pushLog(s, 'depth', fill(t.log.depth, { depth: s.depth, zone: depthNames(s.depth).zone }))
@@ -422,7 +422,7 @@ export function tick(s: GameState, input: TickInput, cfg: Config): void {
       s.reserveUsed = true
       s.timeLeft += s.meta.reserveSeconds
       pushLog(s, 'system', fill(t.log.reserve, { sec: s.meta.reserveSeconds }))
-      s.risk.queue.push('reserve')
+      if (s.meta.riskMode) s.risk.queue.push('reserve')
     } else {
       if (s.meta.lastStand) {
         pushLog(s, 'system', t.log.lastStand)

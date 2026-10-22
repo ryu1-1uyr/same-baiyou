@@ -70,6 +70,11 @@ const listeners = new Set<() => void>()
 function emit(): void {
   // 説明を出すかどうかは、画面に知らせる直前の状態で決める（カードが一瞬見えてしまわないように）
   tut.observe(tutorial, state, screen)
+  // リスクカードの説明だけは初回ラン以外でも出るので、一度見たらセーブに残して二度と出さない
+  if (tutorial.seen.has('risk') && !meta.riskTutorialSeen) {
+    meta.riskTutorialSeen = true
+    saveMeta(meta)
+  }
   version += 1
   for (const l of listeners) l()
 }
@@ -122,6 +127,13 @@ export function isCodexOpen(): boolean {
 
 export function setCodexOpen(v: boolean): void {
   codexOpen = v
+  emit()
+}
+
+/** リスク取引のオン・オフ。研究所でだけ切り替え、次のランから効く（ラン中に逃げられないように） */
+export function setRiskEnabled(v: boolean): void {
+  meta.riskEnabled = v
+  saveMeta(meta)
   emit()
 }
 
@@ -314,7 +326,10 @@ function recordCodex(): void {
 
 /** tutorial を立てると、初回ランでなくても主任の説明を出す（タイトルの「チュートリアル」） */
 export function startNewRun(opts: { tutorial?: boolean } = {}): void {
-  tutorial = tut.createTutorial(opts.tutorial === true || meta.runs === 0)
+  tutorial = tut.createTutorial(
+    opts.tutorial === true || meta.runs === 0,
+    meta.riskTutorialSeen ? [] : ['risk'],
+  )
   const eff = metaEffects(meta)
   cfg = applyMetaToConfig(baseCfg, eff)
   state = createState(cfg, Math.floor(Math.random() * 1e9), eff)

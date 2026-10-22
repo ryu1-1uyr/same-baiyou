@@ -572,6 +572,11 @@ export const ja = {
     lastStand: { name: '緊急浮上', detail: 'ラン終了時、在庫の検体をすべて投入してから終わる' },
     reservePower: { name: '予備電源', detail: '制限時間が尽きた瞬間、1 ラン に 1 回だけ +20 秒' },
     chainCollapse: { name: '連鎖崩壊', detail: '建物を破壊した際の余剰ダメージが、次の建物に 2 倍で通る' },
+    riskMode: {
+      name: '闇取引',
+      detail:
+        'ボス撃破時と予備電源の作動時に、代償と引き換えのリスクカードが出る。研究所でオン・オフを切り替えられる',
+    },
     tankSynergy: { name: '温度管理', detail: '培養槽 1 個につき培養液の生産 +2%' },
     feederSynergy: { name: '給餌連動', detail: '給餌装置 1 個につき培養液の生産 +3%' },
     breederSynergy: { name: '過密飼育', detail: '繁殖槽 1 個につき検体の生産速度 +2%' },
@@ -727,6 +732,9 @@ export const ja = {
     bestDepth: '最高突破深度 {n}',
     lifetime: '累計予算 {n}',
     start: '次の実験を開始する',
+    riskOn: '闇取引 ON',
+    riskOff: '闇取引 OFF',
+    riskToggle: 'リスクカードを次の実験から出すかどうか',
     taken: '取得済み',
     short: 'あと {n}',
     max: 'MAX',

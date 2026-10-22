@@ -2164,3 +2164,19 @@ body:has(.tutorial-lock) [data-tutorial-focus] {
   position: relative;
   z-index: 11;
 }
+
+/* 研究所のリスク取引の切り替え。オンのときはリスクカードと同じ警告色にする */
+.risk-toggle {
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  background: transparent;
+  color: var(--c-text-dim);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-1);
+  padding: 2px var(--sp-3);
+  cursor: pointer;
+}
+.risk-toggle[data-on='true'] {
+  color: var(--c-danger);
+  border-color: var(--c-danger);
+}

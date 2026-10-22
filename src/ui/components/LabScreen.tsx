@@ -13,7 +13,14 @@ import {
 } from '../../game/meta.ts'
 import { MUTATION_BY_ID } from '../../game/mutations.ts'
 import { ChiefGate } from './Chief.tsx'
-import { getMeta, getTutorial, purchaseNode, startNewRun, tutorialFocus } from '../../store/gameStore.ts'
+import {
+  getMeta,
+  getTutorial,
+  purchaseNode,
+  setRiskEnabled,
+  startNewRun,
+  tutorialFocus,
+} from '../../store/gameStore.ts'
 import { CodexButton } from './CodexButton.tsx'
 import { SharkIcon } from './SharkIcon.tsx'
 import { fmt } from '../format.ts'
@@ -95,6 +102,17 @@ export function LabScreen() {
           <span>{fill(t.lab.lifetime, { n: fmt(meta.lifetimeBudget) })}</span>
         </div>
         <CodexButton />
+        {meta.unlocked.includes('riskMode') && (
+          <button
+            className="risk-toggle"
+            data-on={meta.riskEnabled}
+            aria-pressed={meta.riskEnabled}
+            title={t.lab.riskToggle}
+            onClick={() => setRiskEnabled(!meta.riskEnabled)}
+          >
+            {meta.riskEnabled ? t.lab.riskOn : t.lab.riskOff}
+          </button>
+        )}
         <button
           className="btn"
           data-tutorial-focus={tutorialFocus('lab') || undefined}

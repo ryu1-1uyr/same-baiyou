@@ -17,6 +17,11 @@ const INFO_SEC = 12
 
 export type Tutorial = {
   active: boolean
+  /**
+   * チュートリアルの外でも 1 回だけ出す説明。
+   * リスクカードは研究所で解禁するので初回ランには出ず、ここで出さないと説明する機会が無い
+   */
+  once: Set<TutorialStep>
   seen: Set<TutorialStep>
   /** 表示中の通知。since はゲーム内秒 */
   notice: { step: TutorialStep; since: number } | null
@@ -33,8 +38,17 @@ export type Tutorial = {
   intro: TutorialStep | null
 }
 
-export function createTutorial(active: boolean): Tutorial {
-  return { active, seen: new Set(), notice: null, gate: null, lock: null, hint: null, intro: null }
+export function createTutorial(active: boolean, once: readonly TutorialStep[] = []): Tutorial {
+  return {
+    active,
+    once: new Set(once),
+    seen: new Set(),
+    notice: null,
+    gate: null,
+    lock: null,
+    hint: null,
+    intro: null,
+  }
 }
 
 /** 肩書きを付けて名乗るのは最初の 1 回だけ */
@@ -59,7 +73,9 @@ export function plain(line: string): string {
  * screen は 'title' | 'run' | 'lab'。
  */
 export function observe(tut: Tutorial, s: GameState, screen: string): void {
-  if (!tut.active) return
+  if (!tut.active && tut.once.size === 0) return
+  /** まだ出しておらず、いま出してよい説明か */
+  const allow = (step: TutorialStep) => !tut.seen.has(step) && (tut.active || tut.once.has(step))
 
   // --- 了解待ち ---
   if (tut.gate === null) {
@@ -69,7 +85,7 @@ export function observe(tut: Tutorial, s: GameState, screen: string): void {
         ? 'lab'
         : screen !== 'run'
           ? null
-          : !tut.seen.has('culture')
+          : allow('culture')
             ? 'culture'
             : s.phase === 'over'
               ? 'result'
@@ -83,11 +99,12 @@ export function observe(tut: Tutorial, s: GameState, screen: string): void {
                   s.policyCount > 0
                   ? 'build'
                   : null
-    if (step && !tut.seen.has(step)) {
+    if (step && allow(step)) {
       tut.gate = step
       show(tut, screen === 'lab' ? null : s, step)
     }
   }
+  if (!tut.active) return
 
   // --- 止めない通知（ゲームが動いている場面）---
   if (screen !== 'run' || s.phase === 'over') {

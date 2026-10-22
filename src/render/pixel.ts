@@ -123,12 +123,14 @@ export function drawTail(ctx: CanvasRenderingContext2D, color = PALETTE.fin): vo
  *
  * 区画の並びは変異の定義順。サメは右を向いているので、
  * 名前の接頭辞の並び（左から）と体の並び（尻尾から頭へ）が一致する。
+ *
+ * weight を持つ区画はそのぶん広く取る（省略時は 1）。
  */
 export function tintBands(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  bands: Array<{ rgb: RGB; amount: number }>,
+  bands: Array<{ rgb: RGB; amount: number; weight?: number }>,
   x0: number,
   x1: number,
 ): void {
@@ -136,13 +138,23 @@ export function tintBands(
   const img = ctx.getImageData(0, 0, w, h)
   const d = img.data
   const span = Math.max(1, x1 - x0)
-  const n = bands.length
+  // 区画の右端を 0〜1 の累積で持つ
+  const total = bands.reduce((a, b) => a + (b.weight ?? 1), 0)
+  const ends: number[] = []
+  let acc = 0
+  for (const b of bands) {
+    acc += (b.weight ?? 1) / total
+    ends.push(acc)
+  }
+  const bandAt = (t: number) => {
+    for (let k = 0; k < ends.length; k++) if (t < ends[k]) return bands[k]
+    return bands[bands.length - 1]
+  }
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4
       if (d[i + 3] === 0) continue
-      const t = (x - x0) / span
-      const b = bands[Math.max(0, Math.min(n - 1, Math.floor(t * n)))]
+      const b = bandAt((x - x0) / span)
       d[i] += (b.rgb[0] - d[i]) * b.amount
       d[i + 1] += (b.rgb[1] - d[i + 1]) * b.amount
       d[i + 2] += (b.rgb[2] - d[i + 2]) * b.amount

@@ -1,5 +1,12 @@
 import { useEffect, useRef } from 'react'
-import { type MutationDef, type MutationId, MUTATIONS, nameOfMutations } from '../../game/mutations.ts'
+import { DERIVED, DERIVED_BY_ID, type DerivedId, derivedName } from '../../game/derived.ts'
+import {
+  type MutationDef,
+  type MutationId,
+  MUTATIONS,
+  nameOfMutations,
+  type SharkPart,
+} from '../../game/mutations.ts'
 import { mutationName } from '../../game/mutations.ts'
 import { sharkSprite } from '../../render/sharkSprite.ts'
 import { useAssetVersion } from '../useAssetVersion.ts'
@@ -10,7 +17,7 @@ function Cell({
   label,
   scale = 1,
 }: {
-  mutations: readonly MutationDef[]
+  mutations: readonly SharkPart[]
   label: string
   scale?: number
 }) {
@@ -54,8 +61,27 @@ const COMBOS: Array<[readonly MutationDef[], string]> = [
   [MUTATIONS, '全部乗せ（32種）'],
 ]
 
+/** 派生種を混ぜた組み合わせ。材料の変異は派生種に吸収されるので含めない */
+const mix = (derived: DerivedId[], ...ids: MutationId[]): readonly SharkPart[] => [
+  ...of(...ids),
+  ...derived.map((id) => DERIVED_BY_ID.get(id)!),
+]
+
+const DERIVED_COMBOS: Array<[readonly SharkPart[], string]> = [
+  [mix(['missile'], 'glow'), '発光 + ミサイル'],
+  [mix(['missile'], 'albino', 'poison', 'cosmic'), '3色 + ミサイル（派生種が半分）'],
+  [mix(['heatShock'], 'glow', 'poison', 'albino'), '3色 + ヒートショック（2色）'],
+  [mix(['megalodon'], 'ghost'), '幽体化 + メガロドン'],
+  [mix(['railgun'], 'swarm'), 'ダブル + レールガン'],
+  [mix(['lantern'], 'tentacle'), '触手化 + ランタン'],
+  [mix(['urchin'], 'twinHead'), '双頭化 + 毒ウニ'],
+  [mix(['fiveHead'], 'armor', 'storm'), '装甲 + 暴風 + ファイブヘッド'],
+  [mix(['missile', 'urchin']), 'ミサイル + 毒ウニ（派生種 2 つ）'],
+]
+
 const PLAIN: readonly MutationDef[] = []
 const SINGLES = new Map(MUTATIONS.map((m) => [m.id, [m]]))
+const DERIVED_SINGLES = new Map(DERIVED.map((d) => [d.id, [d]]))
 
 export function SpriteLab({ onClose }: { onClose: () => void }) {
   return (
@@ -73,6 +99,20 @@ export function SpriteLab({ onClose }: { onClose: () => void }) {
           <Cell mutations={PLAIN} label="通常サメ" />
           {MUTATIONS.map((m) => (
             <Cell key={m.id} mutations={SINGLES.get(m.id)!} label={mutationName(m)} />
+          ))}
+        </div>
+
+        <div className="panel-title">派生種</div>
+        <div className="slab-grid">
+          {DERIVED.map((d) => (
+            <Cell key={d.id} mutations={DERIVED_SINGLES.get(d.id)!} label={derivedName(d)} />
+          ))}
+        </div>
+
+        <div className="panel-title">派生種と変異の組み合わせ</div>
+        <div className="slab-grid">
+          {DERIVED_COMBOS.map(([mutations, label]) => (
+            <Cell key={label} mutations={mutations} label={label} />
           ))}
         </div>
 

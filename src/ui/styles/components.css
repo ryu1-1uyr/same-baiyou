@@ -1265,6 +1265,12 @@
   image-rendering: pixelated;
   flex: 0 0 auto;
 }
+/* 巨大化などで transform で拡大したサメは、隣の要素の上に重ねて描く */
+.shark-icon[data-grow],
+.sprite[data-grow] {
+  position: relative;
+  z-index: 1;
+}
 
 /* ---- パネルの階層 ----
  * すべて同じ見た目だと、生死を分けるタイマーと静的な説明文が同格に見える。

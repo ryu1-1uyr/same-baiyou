@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { SharkPart } from '../../game/mutations.ts'
-import { sharkBounds, sharkSprite, spriteKey } from '../../render/sharkSprite.ts'
+import { sharkBounds, sharkSize, sharkSprite, spriteKey } from '../../render/sharkSprite.ts'
 import { useAssetVersion } from '../useAssetVersion.ts'
 
 /** 合成スプライトを DOM に置くための小さなラッパ */
@@ -23,5 +23,22 @@ export function SharkIcon({ mutations, height = 20 }: { mutations: readonly Shar
     g.clearRect(0, 0, c.width, c.height)
     g.drawImage(s, b.x, b.y, b.w, b.h, 0, 0, c.width, c.height)
   }, [key, height, assetVersion])
-  return <canvas className="shark-icon" ref={ref} aria-hidden="true" />
+  const grow = growOf(mutations)
+  return (
+    <canvas
+      className="shark-icon"
+      ref={ref}
+      aria-hidden="true"
+      data-grow={grow !== 1 || undefined}
+      style={grow !== 1 ? { transform: `scale(${grow})` } : undefined}
+    />
+  )
 }
+
+/** 巨大化などで大きいサメを UI 上でも大きく見せる倍率。並びを崩さないよう transform で枠からはみ出させる */
+export function growOf(mutations: readonly SharkPart[]): number {
+  return Math.min(GROW_MAX, sharkSize(mutations))
+}
+
+/** 組み合わせ次第で倍率が積み上がるので、隣の行を覆い尽くさない程度で止める */
+const GROW_MAX = 2

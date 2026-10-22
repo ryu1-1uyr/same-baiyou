@@ -27,6 +27,7 @@ import {
 } from '../game/tick.ts'
 import { fill, t } from '../text/index.ts'
 import { loadMeta, resetMeta, saveMeta } from '../meta/save.ts'
+import * as tut from './tutorial.ts'
 
 /**
  * ゲーム状態は React の外に置き、useSyncExternalStore で購読する。
@@ -61,10 +62,14 @@ let autoBuyMode: AutoBuyMode = 'all'
 let autoBuyTarget: number | null = null
 /** このランの報酬を確定済みか */
 let awarded = false
+/** チュートリアル。初回ランと、タイトルから選んだランでだけ動く */
+let tutorial: tut.Tutorial = tut.createTutorial(false)
 
 const listeners = new Set<() => void>()
 
 function emit(): void {
+  // 説明を出すかどうかは、画面に知らせる直前の状態で決める（カードが一瞬見えてしまわないように）
+  tut.observe(tutorial, state, screen)
   version += 1
   for (const l of listeners) l()
 }
@@ -117,6 +122,25 @@ export function isCodexOpen(): boolean {
 
 export function setCodexOpen(v: boolean): void {
   codexOpen = v
+  emit()
+}
+
+export function getTutorial(): tut.Tutorial {
+  return tutorial
+}
+
+/** いまチュートリアルで光らせる対象か */
+export function tutorialFocus(step: tut.TutorialStep): boolean {
+  return tut.isFocus(tutorial, step)
+}
+
+export function ackTutorial(): void {
+  tut.ack(tutorial)
+  emit()
+}
+
+export function dismissTutorialNotice(): void {
+  tut.dismiss(tutorial)
   emit()
 }
 
@@ -200,6 +224,7 @@ export function manualClick(): { gained: number; crit: boolean } {
   const gained = clickValue(state, cfg) * (crit ? critMult(state) : 1)
   state.culture += gained
   state.cultureTotal += gained
+  tut.onAction(tutorial, 'click')
   emit()
   return { gained, crit }
 }
@@ -246,6 +271,7 @@ export function buy(index: number): void {
   if (state.culture < cost) return
   state.culture -= cost
   state.buildings[index] += 1
+  tut.onAction(tutorial, 'buy')
   emit()
 }
 
@@ -286,7 +312,9 @@ function recordCodex(): void {
   if (changed) saveMeta(meta)
 }
 
-export function startNewRun(): void {
+/** tutorial を立てると、初回ランでなくても主任の説明を出す（タイトルの「チュートリアル」） */
+export function startNewRun(opts: { tutorial?: boolean } = {}): void {
+  tutorial = tut.createTutorial(opts.tutorial === true || meta.runs === 0)
   const eff = metaEffects(meta)
   cfg = applyMetaToConfig(baseCfg, eff)
   state = createState(cfg, Math.floor(Math.random() * 1e9), eff)
@@ -329,7 +357,13 @@ function frame(now: number): void {
   while (acc >= TICK) {
     acc -= TICK
     // タイトル表示中は培養フェーズの持ち時間を減らさない
-    if (screen === 'title' || codexOpen || state.phase === 'over' || state.pendingDraft) {
+    if (
+      screen === 'title' ||
+      codexOpen ||
+      state.phase === 'over' ||
+      state.pendingDraft ||
+      tut.isPaused(tutorial)
+    ) {
       acc = 0
       break
     }
@@ -337,7 +371,12 @@ function frame(now: number): void {
     ticked = true
   }
 
-  if (ticked) runAutoBuy()
+  if (ticked) {
+    const before = state.buildings.reduce((a, b) => a + b, 0)
+    runAutoBuy()
+    // 自動発注で買えたときも「設備を買え」は済んだことにする
+    if (state.buildings.reduce((a, b) => a + b, 0) > before) tut.onAction(tutorial, 'buy')
+  }
   if (!awarded && getState().phase === 'over') {
     awarded = true
     awardRun()

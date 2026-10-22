@@ -10,6 +10,7 @@ import {
   getConfig,
   manualClick,
   setAutoBuyTarget,
+  tutorialFocus,
 } from '../../store/gameStore.ts'
 import { fill, t } from '../../text/index.ts'
 import { fmt } from '../format.ts'
@@ -64,7 +65,12 @@ export function ProducePanel() {
 
   return (
     <div className="col area-produce">
-      <button className="click-area" ref={areaRef} onClick={onCollect}>
+      <button
+        className="click-area"
+        ref={areaRef}
+        onClick={onCollect}
+        data-tutorial-focus={tutorialFocus('culture') || undefined}
+      >
         <Sprite kind="resource" id="culture" size={48} />
         <span className="click-label">{t.resource.collect}</span>
         <span className="click-hint">{fill(t.resource.perClick, { value: fmt(clickValue(s, cfg)) })}</span>
@@ -115,6 +121,7 @@ export function ProducePanel() {
               <button
                 className="buy"
                 data-afford={s.culture >= cost}
+                data-tutorial-focus={(tutorialFocus('build') && s.culture >= cost) || undefined}
                 disabled={s.culture < cost}
                 onClick={() => {
                   buy(i)

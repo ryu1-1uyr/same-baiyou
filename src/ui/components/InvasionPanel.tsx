@@ -1,5 +1,5 @@
 import { bossHp, depthName, targetCount, targetHp } from '../../game/targets.ts'
-import { getConfig } from '../../store/gameStore.ts'
+import { getConfig, tutorialFocus } from '../../store/gameStore.ts'
 import { fill, t } from '../../text/index.ts'
 import { fmt } from '../format.ts'
 import { useGame } from '../useGame.ts'
@@ -39,7 +39,7 @@ export function InvasionPanel() {
     <div className="col area-invasion">
       <div className="panel is-primary">
         <div className="panel-title">{name.zone}</div>
-        <div className="target">
+        <div className="target" data-tutorial-focus={tutorialFocus('boss') || undefined}>
           <div className="target-head">
             <Sprite kind="target" id={s.onBoss ? 'boss' : 'normal'} />
             <span className="target-name" data-boss={s.onBoss}>

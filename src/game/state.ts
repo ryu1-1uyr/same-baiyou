@@ -60,7 +60,18 @@ export type RiskState = {
   depthBonusMult: number
 }
 
-export type LogKind = 'hit' | 'boss' | 'depth' | 'draft' | 'policy' | 'risk' | 'system' | 'birth' | 'record'
+export type LogKind =
+  | 'hit'
+  | 'boss'
+  | 'depth'
+  | 'draft'
+  | 'policy'
+  | 'risk'
+  | 'system'
+  | 'birth'
+  | 'record'
+  /** チュートリアルの主任の通信 */
+  | 'chief'
 /** mutations を持つ行は、その組み合わせのサメを添えて表示する */
 export type LogEntry = { t: number; kind: LogKind; text: string; mutations?: readonly SharkPart[] }
 

@@ -4,10 +4,11 @@ import { policyName } from '../../game/policies.ts'
 import { riskCost, riskName } from '../../game/risks.ts'
 import { playSe } from '../../audio/se.ts'
 import { derivedName, materialsOf } from '../../game/derived.ts'
-import { chooseDerived, chooseDraft, getConfig, reroll, skip } from '../../store/gameStore.ts'
+import { chooseDerived, chooseDraft, getConfig, getTutorial, reroll, skip } from '../../store/gameStore.ts'
 import { fmt, RARITY_LABEL } from '../format.ts'
 import { fill, t } from '../../text/index.ts'
 import { useGame } from '../useGame.ts'
+import { ChiefGate } from './Chief.tsx'
 import { CodexButton } from './CodexButton.tsx'
 import { SharkIcon } from './SharkIcon.tsx'
 import { Sprite } from './Sprite.tsx'
@@ -21,6 +22,10 @@ export function DraftOverlay() {
   const cfg = getConfig()
   const d = s.pendingDraft
   if (!d) return null
+
+  // 初めての種類のドラフトでは、主任の説明に「了解」を押してからカードを出す
+  const gate = getTutorial().gate
+  if (gate === 'policy' || gate === 'mutation' || gate === 'risk') return <ChiefGate step={gate} />
 
   if (d.kind === 'risk') {
     const sub = d.reason === 'reserve' ? t.draft.riskSubReserve : t.draft.riskSubBoss

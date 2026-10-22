@@ -5,6 +5,7 @@ import {
   setAutoBuyMode,
   setSpeed,
   type Speed,
+  tutorialFocus,
 } from '../../store/gameStore.ts'
 import { depthName } from '../../game/targets.ts'
 import { fill, t } from '../../text/index.ts'
@@ -66,7 +67,11 @@ export function HUD() {
       {inCulture ? (
         <div className="hud-standby">{t.phase.standby}</div>
       ) : (
-        <div className="hud-timer" data-warn={s.timeLeft <= 15}>
+        <div
+          className="hud-timer"
+          data-warn={s.timeLeft <= 15}
+          data-tutorial-focus={tutorialFocus('invasion') || undefined}
+        >
           {mmss(s.timeLeft)}
         </div>
       )}

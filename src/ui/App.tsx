@@ -6,6 +6,7 @@ import { useAtmosphere } from './useAtmosphere.ts'
 import { useGame } from './useGame.ts'
 import { useSound } from './useSound.ts'
 import { AudioPanel } from './components/AudioPanel.tsx'
+import { ChiefNotice } from './components/Chief.tsx'
 import { DebugPanel } from './components/DebugPanel.tsx'
 import { DepthFlash } from './components/DepthFlash.tsx'
 import { DraftOverlay } from './components/DraftOverlay.tsx'
@@ -50,6 +51,7 @@ export function App() {
       <ProducePanel />
       <InvasionPanel />
       <StockPanel />
+      <ChiefNotice />
       <DraftOverlay />
       <ResultOverlay />
       <DepthFlash />

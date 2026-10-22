@@ -12,7 +12,8 @@ import {
   TREE,
 } from '../../game/meta.ts'
 import { MUTATION_BY_ID } from '../../game/mutations.ts'
-import { getMeta, purchaseNode, startNewRun } from '../../store/gameStore.ts'
+import { ChiefGate } from './Chief.tsx'
+import { getMeta, getTutorial, purchaseNode, startNewRun, tutorialFocus } from '../../store/gameStore.ts'
 import { CodexButton } from './CodexButton.tsx'
 import { SharkIcon } from './SharkIcon.tsx'
 import { fmt } from '../format.ts'
@@ -78,6 +79,8 @@ export function LabScreen() {
 
   return (
     <div className="lab">
+      {/* 初回ランのあとだけ、研究所の見方を主任が説明する。ツリーは後ろに見えたままにする */}
+      {getTutorial().gate === 'lab' && <ChiefGate step="lab" />}
       <div className="lab-head">
         <div>
           <div className="panel-title">{t.lab.title}</div>
@@ -92,7 +95,11 @@ export function LabScreen() {
           <span>{fill(t.lab.lifetime, { n: fmt(meta.lifetimeBudget) })}</span>
         </div>
         <CodexButton />
-        <button className="btn" onClick={startNewRun}>
+        <button
+          className="btn"
+          data-tutorial-focus={tutorialFocus('lab') || undefined}
+          onClick={() => startNewRun()}
+        >
           {t.lab.start}
         </button>
       </div>

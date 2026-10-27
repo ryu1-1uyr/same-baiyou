@@ -466,7 +466,7 @@ export const ja = {
     condensate: { name: '培養液の濃縮', detail: '培養液の自動生産 ×{mult}' },
     forcing: { name: '促成培養', detail: '検体の生産速度 ×{mult}' },
     pressurize: { name: '加圧射出', detail: '投入速度 ×{mult}' },
-    recycle: { name: '検体の再利用', detail: '投入した検体の {pct}% が在庫へ戻る' },
+    recycle: { name: '検体の再利用', detail: '投入した検体の {pct}% が、同じ姿のまま在庫へ戻る' },
     preempt: { name: '実験の前倒し', detail: '次の突然変異までの必要数 −{pct}%' },
     reprocess: { name: '廃液の再処理', detail: '検体 1 体の生産に要する培養液 −{pct}%' },
     preserve: { name: '標本の保存', detail: 'ラン終了時の研究予算 +{pct}%' },
@@ -567,7 +567,10 @@ export const ja = {
     earlyDraft: { name: '早期実験', detail: '最初のドラフトが累計 10 体で訪れる（通常は 50 体）' },
     extraOffer: { name: '追加検体枠', detail: 'ドラフトの提示が 3 枚から 4 枚になる' },
     prototype: { name: '試作認可', detail: '突然変異のランク上限が 3 から 4 になる' },
-    lastStand: { name: '緊急浮上', detail: 'ラン終了時、在庫の検体をすべて投入してから終わる' },
+    lastStand: {
+      name: '緊急浮上',
+      detail: 'ラン終了時、在庫の検体をすべて投入してから終わる。進めるのは今の深度のクリアまで',
+    },
     reservePower: { name: '予備電源', detail: '制限時間が尽きた瞬間、1 ラン に 1 回だけ +20 秒' },
     chainCollapse: { name: '連鎖崩壊', detail: '建物を破壊した際の余剰ダメージが、次の建物に 2 倍で通る' },
     riskMode: {

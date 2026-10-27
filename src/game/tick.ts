@@ -407,11 +407,13 @@ export function tick(s: GameState, input: TickInput, cfg: Config): void {
 
   // --- 侵略 ---
   const n = launchRate(s, cfg) * dt
-  const { launched, damage } = launchWeakest(s.inv, n, s.slots, s.ranks, cfg, s.powerCache)
+  const sent: Array<[MutationMask, number]> | undefined = s.policyFx.recycle > 0 ? [] : undefined
+  const { launched, damage } = launchWeakest(s.inv, n, s.slots, s.ranks, cfg, s.powerCache, sent)
   // 在庫が足りずに出しきれないことがあるので、実際に出た数をならして持っておく
   s.launchedPerSec += (launched / dt - s.launchedPerSec) * LAUNCH_SMOOTH
-  // 検体の再利用: 投入した個体の一部が在庫へ戻る
-  if (s.policyFx.recycle > 0 && launched > 0) addSharks(s.inv, 0, launched * s.policyFx.recycle)
+  // 検体の再利用: 投入した個体の一部が、同じ組み合わせのまま在庫へ戻る。
+  // 通常サメに変えて戻すと、在庫を出し切る状態（投入 > 生産）で在庫が通常サメだけに見えてしまう
+  if (sent) for (const [mask, count] of sent) addSharks(s.inv, mask, count * s.policyFx.recycle)
   applyDamage(s, cfg, damage * riskMult(s, 'power'))
   if (s.risk.timers.length > 0) s.risk.timers = s.risk.timers.filter((x) => x.until > s.t)
 
@@ -436,12 +438,15 @@ export function tick(s: GameState, input: TickInput, cfg: Config): void {
   }
 }
 
-/** 与えたダメージを標的に通す。破壊したら余剰を次の標的へ持ち越す */
-function applyDamage(s: GameState, cfg: Config, damage: number): void {
+/**
+ * 与えたダメージを標的に通す。破壊したら余剰を次の標的へ持ち越す。
+ * maxDepth を渡すと、その深度をクリアした時点で止め、余りは捨てる。
+ */
+function applyDamage(s: GameState, cfg: Config, damage: number, maxDepth = Infinity): void {
   let dmg = damage
   let chained = false
   let guard = 0
-  while (dmg > 0 && guard++ < 1000) {
+  while (dmg > 0 && s.depth <= maxDepth && guard++ < 1000) {
     if (dmg < s.currentHp) {
       s.currentHp -= dmg
       s.score += dmg
@@ -456,12 +461,16 @@ function applyDamage(s: GameState, cfg: Config, damage: number): void {
   }
 }
 
-/** 緊急浮上。ラン終了の瞬間に在庫の検体をすべて投入する */
+/**
+ * 緊急浮上。ラン終了の瞬間に在庫の検体をすべて投入する。
+ * 進めるのは今の深度のクリアまで。上限が無いと、溜めた在庫を最後に流すだけで深度が十数も進み、
+ * 投入速度を上げる意味が無くなる（実測で深度 9 の時間切れから深度 24 まで進んでいた）
+ */
 function finalVolley(s: GameState, cfg: Config): void {
   const all = totalSharks(s.inv)
   if (all <= 0) return
   const { damage } = launchWeakest(s.inv, all, s.slots, s.ranks, cfg, s.powerCache)
-  applyDamage(s, cfg, damage * riskMult(s, 'power'))
+  applyDamage(s, cfg, damage * riskMult(s, 'power'), s.depth)
 }
 
 /** 提示中のドラフトを引き直す。1 ラン に使える回数は恒久強化で決まり、リスクカードと共有する */

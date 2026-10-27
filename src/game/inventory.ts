@@ -45,6 +45,7 @@ export function sortedByPower(
 /**
  * 弱い順に最大 n 体を出撃させ、与えた総ダメージを返す。
  * 出撃したサメは戦闘力にかかわらず在庫から失われる。
+ * out を渡すと、出撃した内訳（組み合わせと頭数）をそこに積む（研究方針「検体の再利用」で戻すため）。
  */
 export function launchWeakest(
   inv: Inventory,
@@ -53,6 +54,7 @@ export function launchWeakest(
   ranks: MutationRanks,
   cfg: Config,
   cache?: PowerCache,
+  out?: Array<[MutationMask, number]>,
 ): { launched: number; damage: number } {
   if (n <= 0) return { launched: 0, damage: 0 }
 
@@ -64,6 +66,7 @@ export function launchWeakest(
     for (const [mask, count] of inv) {
       damage +=
         count * (cache ? cachedPower(slots, mask, ranks, cfg, cache) : powerOfMask(slots, mask, ranks, cfg))
+      out?.push([mask, count])
     }
     inv.clear()
     return { launched: total, damage }
@@ -76,6 +79,7 @@ export function launchWeakest(
     if (remaining <= 0) break
     const take = Math.min(stack.count, remaining)
     damage += take * stack.power
+    out?.push([stack.mask, take])
     launched += take
     remaining -= take
     const left = stack.count - take
